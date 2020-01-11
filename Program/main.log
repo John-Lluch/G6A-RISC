@@ -1,0 +1,8 @@
+
+-----
+file:///Users/joan/Documents-Local/Relay/G6A-RISC/Program/main.s
+
+main:
+	mov 100, r4
+	mov [r4, 0], r1
+ERROR: Unrecognised Instruction Pattern: mov [r4, 0], r1, file:main.s line:10
