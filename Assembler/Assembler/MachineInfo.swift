@@ -12,8 +12,9 @@ import Foundation
 struct ReferenceKind: OptionSet
 {
   let rawValue:Int
-  static let relative = ReferenceKind(rawValue: 1 << 1)      // Indirect memory addressing
-  static let absolute = ReferenceKind(rawValue: 1 << 2)      // Indirect program addressing
+  static let relative = ReferenceKind(rawValue: 1 << 1)      // Relative memory addressing
+  static let absolute = ReferenceKind(rawValue: 1 << 2)      // Absolute program addressing
+  static let immediate = ReferenceKind(rawValue: 1 << 4)      // Immediate constant
 }
 
 
@@ -75,7 +76,7 @@ class InstWithImmediate:MachineInstr
   func inRange( _ v:Int ) -> Bool
   {
     // This tests true only for positive values that fit in the mask size
-    // Might be overrided to test sign extended immediates
+    // Might be overriden to test sign extended immediates
     return v & Int(mask) == v
   }
   
@@ -93,7 +94,7 @@ class TypeP:InstWithImmediate
   init( op:UInt16, a:UInt16, kind:ReferenceKind )
   {
     super.init(mask:0b111_1111_1111, offs:0, kind:kind )
-    encoding |= (0b11) << 14
+    encoding |= (0b00)        << 14
     encoding |= (0b111 & op)  << 11
     encoding |= (mask & a)    << offs
   }
@@ -137,6 +138,26 @@ class TypeI_0:TypeI
   }
 }
 
+// Same as TypeI, but the destination register is implicitly the PC
+class TypeJ:TypeI
+{
+  required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
+    self.init( op:op, fn:fn, ri:7, k:ops[0].u16value,  kind:kind )
+  }
+  
+  override func inRange( _ v:Int ) -> Bool {
+    // This tests true for positive values that fit in the mask size
+    // or negative values which complement would also fit
+    return abs(v) <= Int(mask)
+  }
+  
+  func setBackwards()
+  {
+    if (encoding >> 11) & 0b111 == 0b100 { encoding |= 0b1 << 11 }  // convert b+ into b-
+    else if (encoding >> 11) & 0b111 == 0b111 { encoding |= 0b1 << 7 } // convert bt+, bf+ into bt-, bf-
+  }
+}
+
 // Type ZP
 
 class TypeZP:InstWithImmediate
@@ -173,11 +194,11 @@ class TypeM:InstWithImmediate
   init( op:UInt16, rk:UInt16, s:UInt16, ri:UInt16, a:UInt16, kind:ReferenceKind )
   {
     super.init(mask:0b1_1111, offs:0, kind:kind)
-    let ak = rk - 4 ;
+    let an = (rk-3) & 0b11   // This means an = 0 if rk is 7
     encoding |= (0b00)        << 14
     encoding |= (0b111 & op)  << 11
     encoding |= (0b111 & ri)  << 8
-    encoding |= (0b11 & ak)   << 6
+    encoding |= (0b11 & an)   << 6
     encoding |= (0b1 & s)     << 5
     encoding |= (mask & a)    << offs
   }
@@ -187,11 +208,27 @@ class TypeM:InstWithImmediate
   }
 }
 
-// Same as TypeZP, but for store ops
+// Same as TypeM, but for store ops
 class TypeM_s:TypeM
 {
   required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
-    self.init( op:op, rk:ops[1].u16value, s:0, ri:ops[0].u16value, a:ops[2].u16value,  kind:kind )
+    self.init( op:op, rk:ops[1].u16value, s:1, ri:ops[0].u16value, a:ops[2].u16value,  kind:kind )
+  }
+}
+
+// Same as TypeM but for extended instructions with zero operands
+class TypeM_ex0:TypeM
+{
+  required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
+    self.init( op:op, rk:7, s:0, ri:0, a:0,  kind:kind )
+  }
+}
+
+// Same as TypeM but for extended instructions with two operands
+class TypeM_ex2:TypeM
+{
+  required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
+    self.init( op:op, rk:7, s:0, ri:ops[1].u16value, a:ops[0].u16value,  kind:kind )
   }
 }
 
@@ -223,11 +260,19 @@ class TypeR_cmp:TypeR
   }
 }
 
-// Same as TypeR, but for 2 operand instructions
-class TypeR_2:TypeR
+// Same as TypeR, but for 2 operand instructions using Rk
+class TypeR_2k:TypeR
 {
   required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
     self.init( op:op, fn:fn, ri:ops[1].u16value, rj:0, rk:ops[0].u16value, kind:kind)
+  }
+}
+
+// Same as TypeR, but for 2 operand instructions using Rj
+class TypeR_2j:TypeR
+{
+  required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
+    self.init( op:op, fn:fn, ri:ops[1].u16value, rj:ops[0].u16value, rk:0, kind:kind)
   }
 }
 
@@ -256,195 +301,337 @@ class MachineInstrList
   // Dictionary returning a unique MachineInstr type and opcode for a given Instruction
   static let allInstr:Dictionary<Instruction, (ty:MachineInstr.Type, kind:ReferenceKind, op:UInt16, fn:UInt16)> =
   [
+    // Type Extended
+    Instruction( "pfx".d,    [OpImm()] )                                        : (ty:TypeP.self,  kind:[], op:0b000, fn:0),
+    Instruction( "pfx".d,    [OpSym()] )                                        : (ty:TypeP.self,  kind:[.absolute], op:0b000, fn:0),
+    Instruction( "hlt".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b001, fn:0),
+    Instruction( "--0".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b010, fn:0),
+    Instruction( "lp".d,     [OpReg(.indirect), OpReg()] )                      : (ty:TypeM_ex2.self,  kind:[], op:0b011, fn:0),
+    Instruction( "--1".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b100, fn:0),
+    Instruction( "--2".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b101, fn:0),
+    Instruction( "--3".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b110, fn:0),
+    Instruction( "--4".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b111, fn:0),
+  
     // Type M load
     
-    Instruction( "cmp".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b000, fn:0),
-    Instruction( "mov".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b001, fn:0),
-    Instruction( "add".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b010, fn:0),
-    Instruction( "sub".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b011, fn:0),
-    Instruction( "and".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b100, fn:0),
-    Instruction( "---".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b101, fn:0),
-    Instruction( "---".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b011, fn:0),
+    Instruction( "--0".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b000, fn:0),
+    Instruction( "--1".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b001, fn:0),
+    Instruction( "cmp".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b010, fn:0),
+    Instruction( "mov".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b011, fn:0),
+    Instruction( "add".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b100, fn:0),
+    Instruction( "sub".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b101, fn:0),
+    Instruction( "and".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b110, fn:0),
     Instruction( "adt".d,    [OpReg(.indirect), OpImm(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[], op:0b111, fn:0),
+    
+    Instruction( "--0".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b000, fn:0),
+    Instruction( "--1".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b001, fn:0),
+    Instruction( "cmp".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b010, fn:0),
+    Instruction( "mov".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b011, fn:0),
+    Instruction( "add".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b100, fn:0),
+    Instruction( "sub".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b101, fn:0),
+    Instruction( "and".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b110, fn:0),
+    Instruction( "adt".d,    [OpReg(.indirect), OpSym(.indirect), OpReg()] )    : (ty:TypeM.self,  kind:[.absolute], op:0b111, fn:0),
     
     // Type M store
     
-    Instruction( "---".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b000, fn:0),
-    Instruction( "mov".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b001, fn:0),
-    Instruction( "add".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b010, fn:0),
-    Instruction( "sub".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b011, fn:0),
-    Instruction( "and".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b100, fn:0),
-    Instruction( "---".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b101, fn:0),
-    Instruction( "---".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b011, fn:0),
+    Instruction( "--0".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b000, fn:0),
+    Instruction( "--1".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b001, fn:0),
+    Instruction( "--2".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b010, fn:0),
+    Instruction( "mov".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b011, fn:0),
+    Instruction( "add".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b100, fn:0),
+    Instruction( "sub".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b101, fn:0),
+    Instruction( "and".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b110, fn:0),
     Instruction( "adt".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_s.self,  kind:[], op:0b111, fn:0),
+    
+    Instruction( "--0".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b000, fn:0),
+    Instruction( "--1".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b001, fn:0),
+    Instruction( "--2".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b010, fn:0),
+    Instruction( "mov".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b011, fn:0),
+    Instruction( "add".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b100, fn:0),
+    Instruction( "sub".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b101, fn:0),
+    Instruction( "and".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b110, fn:0),
+    Instruction( "adt".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_s.self,  kind:[.absolute], op:0b111, fn:0),
 
     // Type ZP load
     
-    Instruction( "cmp".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b00),
-    Instruction( "mov".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b00),
-    Instruction( "add".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b00),
-    Instruction( "sub".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b00),
-    Instruction( "and".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b00),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b00),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b00),
+    Instruction( "--0".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b00),
+    Instruction( "--1".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b00),
+    Instruction( "cmp".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b00),
+    Instruction( "mov".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.immediate], op:0b011, fn:0b00),
+    Instruction( "add".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b00),
+    Instruction( "sub".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b00),
+    Instruction( "and".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b110, fn:0b00),
     Instruction( "adt".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b111, fn:0b00),
     
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b01),
-    Instruction( "set".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b01),
-    Instruction( "dad".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b01),
-    Instruction( "rsb".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b01),
-    Instruction( "or".d,     [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b01),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b01),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "--2".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b01),
+    Instruction( "--3".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b01),
+    Instruction( "--4".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b01),
+    Instruction( "set".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "dad".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b01),
+    Instruction( "rsb".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b01),
+    Instruction( "or".d,     [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b110, fn:0b01),
     Instruction( "adf".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b111, fn:0b01),
     
-    Instruction( "cpc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b10),
-    Instruction( "sef".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b10),
-    Instruction( "adc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b10),
-    Instruction( "sbc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b10),
-    Instruction( "xor".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b10),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b10),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "--5".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b10),
+    Instruction( "--6".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b10),
+    Instruction( "cpc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b10),
+    Instruction( "sef".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "adc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b10),
+    Instruction( "sbc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b10),
+    Instruction( "xor".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b110, fn:0b10),
     Instruction( "sbt".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b111, fn:0b10),
     
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b11),
-    Instruction( "sel".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b11),
-    Instruction( "dac".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b11),
-    Instruction( "dsc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b11),
-    Instruction( "mvl".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b11),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b11),
-    Instruction( "---".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "--7".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b000, fn:0b11),
+    Instruction( "--8".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b001, fn:0b11),
+    Instruction( "--9".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b010, fn:0b11),
+    Instruction( "sel".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "dac".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b100, fn:0b11),
+    Instruction( "dsc".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b101, fn:0b11),
+    Instruction( "mvl".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b110, fn:0b11),
     Instruction( "sbf".d,    [OpImm(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[], op:0b111, fn:0b11),
+    
+    Instruction( "--0".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b000, fn:0b00),
+    Instruction( "--1".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b001, fn:0b00),
+    Instruction( "cmp".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b010, fn:0b00),
+    Instruction( "mov".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b011, fn:0b00),
+    Instruction( "add".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b100, fn:0b00),
+    Instruction( "sub".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b101, fn:0b00),
+    Instruction( "and".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b110, fn:0b00),
+    Instruction( "adt".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b111, fn:0b00),
+    
+    Instruction( "--2".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b000, fn:0b01),
+    Instruction( "--3".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b001, fn:0b01),
+    Instruction( "--4".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b010, fn:0b01),
+    Instruction( "set".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b011, fn:0b01),
+    Instruction( "dad".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b100, fn:0b01),
+    Instruction( "rsb".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b101, fn:0b01),
+    Instruction( "or".d,     [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b110, fn:0b01),
+    Instruction( "adf".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b111, fn:0b01),
+    
+    Instruction( "--5".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b000, fn:0b10),
+    Instruction( "--6".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b001, fn:0b10),
+    Instruction( "cpc".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b010, fn:0b10),
+    Instruction( "sef".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b011, fn:0b10),
+    Instruction( "adc".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b100, fn:0b10),
+    Instruction( "sbc".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b101, fn:0b10),
+    Instruction( "xor".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b110, fn:0b10),
+    Instruction( "sbt".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b111, fn:0b10),
+    
+    Instruction( "--7".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b000, fn:0b11),
+    Instruction( "--8".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b001, fn:0b11),
+    Instruction( "--9".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b010, fn:0b11),
+    Instruction( "sel".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b011, fn:0b11),
+    Instruction( "dac".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b100, fn:0b11),
+    Instruction( "dsc".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b101, fn:0b11),
+    Instruction( "mvl".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b110, fn:0b11),
+    Instruction( "sbf".d,    [OpSym(.indirect), OpReg()] )                      : (ty:TypeZP.self,  kind:[.absolute], op:0b111, fn:0b11),
     
     // Type ZP store
     
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b00),
-    Instruction( "mov".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b00),
-    Instruction( "add".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b00),
-    Instruction( "sub".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b00),
-    Instruction( "and".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b00),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b00),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b00),
+    Instruction( "--0".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b00),
+    Instruction( "--1".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b00),
+    Instruction( "--2".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b00),
+    Instruction( "mov".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.immediate], op:0b011, fn:0b00),
+    Instruction( "add".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b00),
+    Instruction( "sub".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b00),
+    Instruction( "and".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b110, fn:0b00),
     Instruction( "adt".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b111, fn:0b00),
     
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b01),
-    Instruction( "set".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b01),
-    Instruction( "dad".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b01),
-    Instruction( "rsb".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b01),
-    Instruction( "or".d,     [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b01),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b01),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "--3".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b01),
+    Instruction( "--4".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b01),
+    Instruction( "--5".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b01),
+    Instruction( "set".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "dad".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b01),
+    Instruction( "rsb".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b01),
+    Instruction( "or".d,     [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b110, fn:0b01),
     Instruction( "adf".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b111, fn:0b01),
     
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b10),
-    Instruction( "sef".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b10),
-    Instruction( "adc".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b10),
-    Instruction( "sbc".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b10),
-    Instruction( "xor".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b10),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b10),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "--6".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b10),
+    Instruction( "--7".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b10),
+    Instruction( "--8".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b10),
+    Instruction( "sef".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "adc".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b10),
+    Instruction( "sbc".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b10),
+    Instruction( "xor".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b110, fn:0b10),
     Instruction( "sbt".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b111, fn:0b10),
     
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b11),
-    Instruction( "sel".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b11),
-    Instruction( "dac".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b11),
-    Instruction( "dsc".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b11),
-    Instruction( "mvl".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b11),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b11),
-    Instruction( "---".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "--9".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b000, fn:0b11),
+    Instruction( "--A".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b001, fn:0b11),
+    Instruction( "--B".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b010, fn:0b11),
+    Instruction( "sel".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "dac".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b100, fn:0b11),
+    Instruction( "dsc".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b101, fn:0b11),
+    Instruction( "mvl".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b110, fn:0b11),
     Instruction( "sbf".d,    [OpReg(), OpImm(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[], op:0b111, fn:0b11),
  
+    Instruction( "--0".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b000, fn:0b00),
+    Instruction( "--1".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b001, fn:0b00),
+    Instruction( "--2".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b010, fn:0b00),
+    Instruction( "mov".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b011, fn:0b00),
+    Instruction( "add".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b100, fn:0b00),
+    Instruction( "sub".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b101, fn:0b00),
+    Instruction( "and".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b110, fn:0b00),
+    Instruction( "adt".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b111, fn:0b00),
+    
+    Instruction( "--3".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b000, fn:0b01),
+    Instruction( "--4".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b001, fn:0b01),
+    Instruction( "--5".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b010, fn:0b01),
+    Instruction( "set".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b011, fn:0b01),
+    Instruction( "dad".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b100, fn:0b01),
+    Instruction( "rsb".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b101, fn:0b01),
+    Instruction( "or".d,     [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b110, fn:0b01),
+    Instruction( "adf".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b111, fn:0b01),
+    
+    Instruction( "--6".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b000, fn:0b10),
+    Instruction( "--7".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b001, fn:0b10),
+    Instruction( "--8".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b010, fn:0b10),
+    Instruction( "sef".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b011, fn:0b10),
+    Instruction( "adc".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b100, fn:0b10),
+    Instruction( "sbc".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b101, fn:0b10),
+    Instruction( "xor".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b110, fn:0b10),
+    Instruction( "sbt".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b111, fn:0b10),
+    
+    Instruction( "--9".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b000, fn:0b11),
+    Instruction( "--A".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b001, fn:0b11),
+    Instruction( "--B".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b010, fn:0b11),
+    Instruction( "sel".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b011, fn:0b11),
+    Instruction( "dac".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b100, fn:0b11),
+    Instruction( "dsc".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b101, fn:0b11),
+    Instruction( "mvl".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b110, fn:0b11),
+    Instruction( "sbf".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeZP_s.self,  kind:[.absolute], op:0b111, fn:0b11),
+    
  // Type R
     
-    Instruction( "cmp".d,    [OpCC(), OpReg(), OpReg()] )                       : (ty:TypeR_cmp.self,  kind:[], op:0b000, fn:0b00),
-    Instruction( "mov".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2.self,  kind:[], op:0b001, fn:0b00),
-    Instruction( "add".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b010, fn:0b00),
-    Instruction( "sub".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b00),
-    Instruction( "and".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b00),
-    Instruction( "sr1".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b00),
-    Instruction( "sl1".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b00),
+    Instruction( "sr1".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2j.self,  kind:[], op:0b000, fn:0b00),
+    Instruction( "sl1".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2j.self,  kind:[], op:0b001, fn:0b00),
+    Instruction( "cmp".d,    [OpCC(), OpReg(), OpReg()] )                       : (ty:TypeR_cmp.self,  kind:[], op:0b010, fn:0b00),
+    Instruction( "mov".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2k.self,  kind:[], op:0b011, fn:0b00),
+    Instruction( "add".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b00),
+    Instruction( "sub".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b00),
+    Instruction( "and".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b110, fn:0b00),
     Instruction( "adt".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b111, fn:0b00),
     
-    Instruction( "---".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b000, fn:0b01),
-    Instruction( "set".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2.self,  kind:[], op:0b001, fn:0b01),
-    Instruction( "dad".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b010, fn:0b01),
-    Instruction( "rsb".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b01),
-    Instruction( "or".d,     [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b01),
-    Instruction( "rr1".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b01),
-    Instruction( "rl1".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "rr1".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b000, fn:0b01),
+    Instruction( "rl1".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b001, fn:0b01),
+    Instruction( "--0".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b010, fn:0b01),
+    Instruction( "set".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2k.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "dad".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b01),
+    Instruction( "rsb".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b01),
+    Instruction( "or".d,     [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b110, fn:0b01),
     Instruction( "adf".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b111, fn:0b01),
     
-    Instruction( "cpc".d,    [OpCC(), OpReg(), OpReg()] )                       : (ty:TypeR_cmp.self,  kind:[], op:0b000, fn:0b10),
-    Instruction( "sef".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2.self,  kind:[], op:0b001, fn:0b10),
-    Instruction( "adc".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b010, fn:0b10),
-    Instruction( "sbc".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b10),
-    Instruction( "xor".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b10),
-    Instruction( "sr4".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b10),
-    Instruction( "sl4".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "sr4".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2j.self,  kind:[], op:0b000, fn:0b10),
+    Instruction( "sl4".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2j.self,  kind:[], op:0b001, fn:0b10),
+    Instruction( "cpc".d,    [OpCC(), OpReg(), OpReg()] )                       : (ty:TypeR_cmp.self,  kind:[], op:0b010, fn:0b10),
+    Instruction( "sef".d,    [OpReg(), OpReg()] )                               : (ty:TypeR_2k.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "adc".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b10),
+    Instruction( "sbc".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b10),
+    Instruction( "xor".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b110, fn:0b10),
     Instruction( "sbt".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b111, fn:0b10),
     
-    Instruction( "---".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b000, fn:0b11),
-    Instruction( "sel".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b001, fn:0b11),
-    Instruction( "dac".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b010, fn:0b11),
-    Instruction( "dsc".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b11),
-    Instruction( "mvl".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b11),
-    Instruction( "rr4".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b11),
-    Instruction( "rl4".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "rr4".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b000, fn:0b11),
+    Instruction( "rl4".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b001, fn:0b11),
+    Instruction( "--1".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b010, fn:0b11),
+    Instruction( "sel".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "dac".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b100, fn:0b11),
+    Instruction( "dsc".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b101, fn:0b11),
+    Instruction( "mvl".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b110, fn:0b11),
     Instruction( "sbf".d,    [OpReg(), OpReg(), OpReg()] )                      : (ty:TypeR.self,  kind:[], op:0b111, fn:0b11),
  
     // Type I
     
-    Instruction( "cmp".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b000, fn:0b00),
-    Instruction( "mov".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b00),
-    Instruction( "add".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b00),
-    Instruction( "sub".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b00),
-    Instruction( "and".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b00),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b00),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b00),
+    Instruction( "--0".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b000, fn:0b00),
+    Instruction( "--1".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b00),
+    Instruction( "cmp".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b00),
+    Instruction( "mov".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b00),
+    Instruction( "add".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b00),
+    Instruction( "sub".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b00),
+    Instruction( "and".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b110, fn:0b00),
     Instruction( "adt".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b111, fn:0b00),
     
-    Instruction( "pfx".d,    [OpImm()] )                                        : (ty:TypeP.self,  kind:[], op:0b000, fn:0b01),
-    Instruction( "set".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b01),
-    Instruction( "dad".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b01),
-    Instruction( "rsb".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b01),
-    Instruction( "or".d,     [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b01),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b01),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "--2".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b000, fn:0b01),
+    Instruction( "--3".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b01),
+    Instruction( "--4".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b01),
+    Instruction( "set".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b01),
+    Instruction( "dad".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b01),
+    Instruction( "rsb".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b01),
+    Instruction( "or".d,     [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b110, fn:0b01),
     Instruction( "adf".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b111, fn:0b01),
     
-    Instruction( "cpc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b000, fn:0b10),
-    Instruction( "sef".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b10),
-    Instruction( "adc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b10),
-    Instruction( "sbc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b10),
-    Instruction( "xor".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b10),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b10),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "--5".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b000, fn:0b10),
+    Instruction( "--6".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b10),
+    Instruction( "cpc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b10),
+    Instruction( "sef".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b10),
+    Instruction( "adc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b10),
+    Instruction( "sbc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b10),
+    Instruction( "xor".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b110, fn:0b10),
     Instruction( "sbt".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b111, fn:0b10),
     
-    Instruction( "hlt".d,    [] )                                               : (ty:TypeI_0.self,  kind:[], op:0b000, fn:0b11),
-    Instruction( "sel".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b11),
-    Instruction( "dac".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b11),
-    Instruction( "dsc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b11),
-    Instruction( "mvl".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b11),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b11),
-    Instruction( "---".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "--7".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b000, fn:0b11),
+    Instruction( "--8".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b001, fn:0b11),
+    Instruction( "--9".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b010, fn:0b11),
+    Instruction( "sel".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b011, fn:0b11),
+    Instruction( "dac".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b100, fn:0b11),
+    Instruction( "dsc".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b101, fn:0b11),
+    Instruction( "mvl".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b110, fn:0b11),
     Instruction( "sbf".d,    [OpImm(), OpReg()] )                               : (ty:TypeI.self,  kind:[], op:0b111, fn:0b11),
     
+    Instruction( "--0".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b000, fn:0b00),
+    Instruction( "--1".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b001, fn:0b00),
+    Instruction( "cmp".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b010, fn:0b00),
+    Instruction( "mov".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b011, fn:0b00),
+    Instruction( "add".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b100, fn:0b00),
+    Instruction( "sub".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b101, fn:0b00),
+    Instruction( "and".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b110, fn:0b00),
+    Instruction( "adt".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b111, fn:0b00),
+    
+    Instruction( "--2".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b000, fn:0b01),
+    Instruction( "--3".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b001, fn:0b01),
+    Instruction( "--4".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b010, fn:0b01),
+    Instruction( "set".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b011, fn:0b01),
+    Instruction( "dad".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b100, fn:0b01),
+    Instruction( "rsb".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b101, fn:0b01),
+    Instruction( "or".d,     [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b110, fn:0b01),
+    Instruction( "adf".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b111, fn:0b01),
+    
+    Instruction( "--5".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b000, fn:0b10),
+    Instruction( "--6".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b001, fn:0b10),
+    Instruction( "cpc".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b010, fn:0b10),
+    Instruction( "sef".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b011, fn:0b10),
+    Instruction( "adc".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b100, fn:0b10),
+    Instruction( "sbc".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b101, fn:0b10),
+    Instruction( "xor".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b110, fn:0b10),
+    Instruction( "sbt".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b111, fn:0b10),
+    
+    Instruction( "--7".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b000, fn:0b11),
+    Instruction( "--8".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b001, fn:0b11),
+    Instruction( "--9".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b010, fn:0b11),
+    Instruction( "sel".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b011, fn:0b11),
+    Instruction( "dac".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b100, fn:0b11),
+    Instruction( "dsc".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b101, fn:0b11),
+    Instruction( "mvl".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b110, fn:0b11),
+    Instruction( "sbf".d,    [OpSym(), OpReg()] )                               : (ty:TypeI.self,  kind:[.absolute], op:0b111, fn:0b11),
+    
+    // Type J
+    
+    Instruction( "j".d,      [OpSym()] )                                        : (ty:TypeJ.self,  kind:[.absolute], op:0b011, fn:0b00),
+    Instruction( "b".d,      [OpSym()] )                                        : (ty:TypeJ.self,  kind:[.relative], op:0b100, fn:0b00),
+    Instruction( "bt".d,     [OpSym()] )                                        : (ty:TypeJ.self,  kind:[.relative], op:0b111, fn:0b00),
+    Instruction( "bf".d,     [OpSym()] )                                        : (ty:TypeJ.self,  kind:[.relative], op:0b111, fn:0b01),
+    Instruction( "jl".d,     [OpSym()] )                                        : (ty:TypeJ.self,  kind:[.absolute], op:0b110, fn:0b11),
+
     // The following represent immediate words
-    Instruction( "_imm".d,   [OpImm()] )                       : (ty:TypeK.self,   kind:[], op:0, fn:0),
-    Instruction( "_imm".d,   [OpSym()] )                       : (ty:TypeK.self,   kind:.absolute, op:0, fn:0),
+    
+    Instruction( "_imm".d,   [OpImm()] )                                        : (ty:TypeK.self,   kind:[], op:0, fn:0),
+    Instruction( "_imm".d,   [OpSym()] )                                        : (ty:TypeK.self,   kind:.absolute, op:0, fn:0),
   ]
-  
-  
-  TO DO posar les instruccions tipus J el prefix tipus J
-  
 
   // Returs a new MachineInstr object initialized with a matching Instruction
   static func newMachineInst( _ inst:Instruction ) -> MachineInstr?
   {
     if let t = allInstr[inst]
     {
-      let machineInst = t.ty.init(op:t.op, ops:inst.ops, rk:t.rk)
+      let machineInst = t.ty.init(op:t.op, fn:t.fn, ops:inst.ops, kind:t.kind)
       return machineInst
     }
 //    else if let opReg = inst.opSP

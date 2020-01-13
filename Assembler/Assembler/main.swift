@@ -47,8 +47,6 @@ class C74_as
     // Did it parse correctly?
     if sourceParser.parse()
     {
-      // Add the Source to the assembler
-      //assembler.addSource( source )
       out.logln()
       return true
     }
@@ -60,9 +58,9 @@ class C74_as
   func parseSources() -> Bool
   {
     // Create the setup code
-    let setup = assembler.getSetupCode()
-    if !parseSource(data:setup) {
-      out.printError( "Errors parsing setup source" )
+    let start = assembler.getStartCode()
+    if !parseSource(data:start) {
+      out.printError( "Errors parsing start source" )
       return false
     }
     
@@ -81,7 +79,12 @@ class C74_as
       break
     }
     
-    // If we get here something went wrong
+    let setup = assembler.getSetupCode()
+    if !parseSource(data:setup) {
+      out.printError( "Errors parsing setup source" )
+      return false
+    }
+    
     return false
   }
   
@@ -95,16 +98,19 @@ class C74_as
     _ = parseSources()
     
     // Did we process all sources?
-    if  assembler.sources.count == console.sources.count + 1
+    if assembler.sources.count == console.sources.count + 2
     {
       // Assemble all sources together
       //assembleSources()
       assembler.assemble()
       
       // Write out the machine code to the destination file
-      out.write(data: assembler.programMemory, url: console.destination)
-
+      out.write(data:assembler.programMemory, url:console.destination)
+      
+      // Write logisim data
+      out.write(data:assembler.getLogisimData(), url:console.logisimDestination)
     }
+    else { out.printError( "Number of sources mismatch" ) }
     
     // Output log file
     out.logln()

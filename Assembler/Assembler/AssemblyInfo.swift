@@ -199,7 +199,7 @@ class Instruction : Hashable, CustomDebugStringConvertible
   // Return an immediate or symbol operand, subjected to be prefixed, if any
   var exOperand:Operand?
   {
-    if !hasPfix { return nil }
+    //if !hasPfix { return nil }
     
     for op in ops
     {
@@ -216,6 +216,16 @@ class Instruction : Hashable, CustomDebugStringConvertible
     for op in ops
     {
       if let opSym = op as? OpSym { return opSym }
+    }
+    return nil
+  }
+  
+  // Return the immediate operand for this instruction if any
+  var immOp:OpImm?
+  {
+    for op in ops
+    {
+      if let opImm = op as? OpImm { return opImm }
     }
     return nil
   }
@@ -294,6 +304,8 @@ class Source
   
   var localSymTable:Dictionary<Data,SymTableInfo> = [:]    // Local symbol table
   var defsTable:Dictionary<Data,Int> = [:] // Register defs table
+  
+  let dataWidth = 2
 
   // Absolute address just past the last instruction in program memory
   func getInstructionsEnd() -> Int {
@@ -316,43 +328,47 @@ class Source
   {
     instr.mcInst = MachineInstrList.newMachineInst(instr)
     instructions.append(instr)
-    instructionsEnd += instr.size //( instr.hasPfix ? 2 : 1 )
-    //instructionsEnd += ( instr.hasExOperand ? 2 : 1 )
+    instructionsEnd += instr.size
   }
   
   // Appends a DataValue at the end of the constant datas array
   func addConstantData( _ value:DataValue )
   {
     constantDatas.append(value)
-    constantDatasEnd += value.byteSize
+    assert( value.byteSize % dataWidth == 0, "Data size must be multiple of data width" )
+    constantDatasEnd += value.byteSize/dataWidth
   }
   
   // Adds padding to account for an aligment requirement on constant data
   func p2AlignConstantData( _ value:Int )
   {
-    while constantDatasEnd & ~(~0<<value) != 0 {
-      addConstantData( DataValue( 1, OpImm(0) ) ) }
+    while constantDatasEnd*dataWidth & ~(~0<<value) != 0 {
+      addConstantData( DataValue( dataWidth, OpImm(0) ) ) }
   }
   
   // Appends a DataValue at the end of the initialized variables array
   func addInitializedVar( _ value:DataValue )
   {
     initializedVars.append(value)
-    initializedVarsEnd += value.byteSize
+    assert( value.byteSize % dataWidth == 0, "Data size must be multiple of two" )
+    initializedVarsEnd += value.byteSize/dataWidth
   }
   
   // Adds padding to account for an aligment requirement on initialized variables
   func p2AlignInitializedVar( _ value:Int )
   {
-    while initializedVarsEnd & ~(~0<<value) != 0 {
-      addInitializedVar( DataValue( 1, OpImm(0) ) ) }
+    while initializedVarsEnd*dataWidth & ~(~0<<value) != 0 {
+      addInitializedVar( DataValue( dataWidth, OpImm(0) ) ) }
   }
   
   // Adds a memory slot for an unitialized variable
-  func addUninitializedVar( size:Int, align:Int  )
+  func addUninitializedVar( size:Int, align:Int  ) -> Int
   {
-    uninitializedVarsEnd += uninitializedVarsEnd % align
-    uninitializedVarsEnd += size
+    uninitializedVarsEnd += uninitializedVarsEnd % (align/dataWidth)
+    assert( size % dataWidth == 0, "Data size must be multiple of two" )
+    let location = uninitializedVarsEnd
+    uninitializedVarsEnd += size/dataWidth
+    return location
   }
 }
 

@@ -111,6 +111,7 @@ class Console
   var path:String = ""                 // The current path
   var sources:[URL] = []               // Source files url array
   var destination:URL?                 // Destination file url
+  var logisimDestination:URL?          // Logisim Destination file url
   var logFile:URL?                     // Log file url
   
   //-------------------------------------------------------------------------------
@@ -227,7 +228,7 @@ class Console
         
           case "o":
             if destination != nil { exitWithErr( "Only one destination allowed" ) }
-            destination = newURLfromArgument(arg, isSource:false, useExtension:"c74")
+            destination = newURLfromArgument(arg, isSource:false, useExtension:"g6a")
         
           case "l":
             if logFile != nil { exitWithErr( "Only one log file allowed" ) }
@@ -249,7 +250,13 @@ class Console
     if destination == nil
     {
       let dest = sources[0].deletingPathExtension();
-      destination = newURLfromArgument( dest.absoluteString, isSource:false, useExtension:"c74");
+      destination = newURLfromArgument( dest.absoluteString, isSource:false, useExtension:"g6a");
+    }
+    
+    if logisimDestination == nil
+    {
+      let dest = destination!.deletingPathExtension();
+      logisimDestination = newURLfromArgument( dest.absoluteString, isSource:false, useExtension:"txt");
     }
     
     if wantsLog

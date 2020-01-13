@@ -1,8 +1,75 @@
+	j setup
 
 -----
 file:///Users/joan/Documents-Local/Relay/G6A-RISC/Program/main.s
 
 main:
-	mov 100, r4
-	mov [r4, 0], r1
-ERROR: Unrecognised Instruction Pattern: mov [r4, 0], r1, file:main.s line:10
+	mov [a], r0
+	add [b], r0
+	mov r0, [result]
+	hlt
+a:
+	33
+b:
+	44
+result:
+
+
+setup:
+	mov setupAddr, r0
+	mov 0, r4
+	mov wordLength, r1
+.LL0:
+	cmp eq, r1, r4
+	bt .LL1
+	lp [r0], r3
+	mov r3, [r4, dataAddr]
+	add 1, r0
+	add 1, r4
+	b .LL0
+.LL1:
+	j main
+
+-----
+Upon machine reset this will be moved to data memory, see setup code below
+
+Constant Data:
+00000 : 0 bytes
+
+Initialised Variables:
+00000 : 0x21,0x00  33  :33
+00001 : 0x2c,0x00  44  :44
+
+Unitialised Variables:
+00002 : 2 bytes
+
+-----
+file:/Users/joan/Documents-Local/Relay/G6A-RISC/Program/main.g6a
+
+Source: start
+00000 : 1101111100000101 (DF05) j setup  Program:00005
+
+Source: main.s
+00001 : 0101100000000000 (5800) mov [a], r0  Data:00000
+00002 : 0110000000000001 (6001) add [b], r0  Data:00001
+00003 : 0101100000100010 (5822) mov r0, [result]  Data:00002
+00004 : 0000100000000000 (0800) hlt
+
+Source: setup
+00005 : 1101100000010000 (D810) mov setupAddr, r0  :00016
+00006 : 1101110000000000 (DC00) mov 0, r4
+00007 : 1101100100000010 (D902) mov wordLength, r1  :00002
+00008 : 1001000000001100 (900C) cmp eq, r1, r4
+00009 : 1111111100000110 (FF06) bt .LL1  Program:+6
+00010 : 0001101100000000 (1B00) lp [r0], r3
+00011 : 0001101101100000 (1B60) mov r3, [r4, dataAddr]  :00000
+00012 : 1110000000000001 (E001) add 1, r0
+00013 : 1110010000000001 (E401) add 1, r4
+00014 : 1110111100000110 (EF06) b .LL0  Program:-6
+00015 : 1101111100000001 (DF01) j main  Program:00001
+
+Source: setupData
+00016 : 0000000000100001 (0021) _imm 33
+00017 : 0000000000101100 (002C) _imm 44
+
+Assembly completed

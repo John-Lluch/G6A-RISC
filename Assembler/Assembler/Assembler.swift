@@ -71,6 +71,9 @@ class Assembler
   var programMemory = Data()
   var dataMemory = Data()
   
+  // Width of data memory entries
+  let dataWidth = 2
+  
   // Add an input Source object
   func addSource( _ source:Source)
   {
@@ -132,43 +135,53 @@ class Assembler
     return SymTableInfo( bank:bank, value:value )
   }
   
+  
+  //-------------------------------------------------------------------------------------------
+  // Insert start code
+  func getStartCode() -> Data
+  {
+    let code =
+    """
+      \t.text
+      \t.file "start"
+      \tj @setup
+    """
+    return code.d
+  }
+  
+  
   //-------------------------------------------------------------------------------------------
   // Insert setup code
   func getSetupCode() -> Data
   {
-    let code = ""
-    
-//    let code =
-//    """
-//      \t.text
-//      \t.file "setup"
-//      \tmov &initialSP, r0
-//      \tmov r0, SP
-//      \tmov @setupAddr, r1    # program memory
-//      \tmov &dataAddr, r2     # data memory
-//      \tmov &wordLength, r0   # counter
-//      .LL0:
-//      \tcmp.eq r0, 0
-//      \tbrcc .LL1
-//      \tld.w {r1}, r3
-//      \tst.w r3, [r2, 0]
-//      \tadd r1, 1, r1
-//      \tadd r2, 2, r2
-//      \tsub r0, 1, r0
-//      \tjmp .LL0
-//      .LL1:
-//      \tcall @main
-//      \thalt
-//    """
-
+    let code =
+    """
+      \t.text
+      \t.file "setup"
+      \t.globl setup
+      setup:
+      \tmov @setupAddr, r0    # program memory
+      \tmov 0, a0             # counter start
+      \tmov &wordLength, r1   # counter end
+      .LL0:
+      \tcmp.eq r1, a0
+      \tbt .LL1
+      \tlp [r0], r3
+      \tmov r3, [a0, &dataAddr]
+      \tadd 1, r0
+      \tadd 1, a0
+      \tb .LL0
+      .LL1:
+      \tj @main
+    """
     return code.d
   }
-
+  
   //-------------------------------------------------------------------------------------------
   // Initialize symbols for the setup code
   func insertSetupSymbols()
   {
-    let setup = sources[0]
+    let setup = sources.last!
     
     setup.localSymTable["initialSP".d] = SymTableInfo(bank:.imm, value:-256)
     setup.localSymTable["setupAddr".d] = SymTableInfo(bank:.imm, value:0)
@@ -180,9 +193,10 @@ class Assembler
   // Append setup data as the final source
   func appendSetupData()
   {
-    assert( getConstantDataEnd() + getInitializedVarsEnd() == dataMemory.count, "Data Memory size mismatch" )
-    
     let setupSrc = Source()
+    
+    assert( dataMemory.count/setupSrc.dataWidth == getConstantDataEnd() + getInitializedVarsEnd(), "Data Memory size mismatch" )
+    
     addSource(setupSrc)
     
     setupSrc.name = "setupData".d
@@ -234,11 +248,13 @@ class Assembler
       
       // Account for possible prefixed instruction
       var thePrefix:TypeP? = nil
-      if let op = inst.exOperand
-      {
-        thePrefix = TypeP( op:0b11111, ops:[op], rk:[] )
-        thePrefix!.setPrefixValue(a:op.u16value)   // Set the prefix address bits
-        theInst?.setPrefixedValue(a:op.u16value)   // Update the prefixed immediate
+      if inst.hasPfix {
+        if let op = inst.exOperand
+        {
+          thePrefix = TypeP( op:0b000, fn:0, ops:[op], kind:[] )
+          thePrefix!.setPrefixValue(a:op.u16value)   // Set the prefix address bits
+          theInst?.setPrefixedValue(a:op.u16value)   // Update the prefixed immediate
+        }
       }
       
       // Initialize some variables.
@@ -257,7 +273,8 @@ class Assembler
         if theInst!.refKind.contains(.relative)
         {
           isRelative = true
-          here = source.instructionsOffset + memIdx + /*pfixOffs + 1*/ inst.size // add inst.size because the PC always points to the next instruction
+          here = source.instructionsOffset + memIdx + inst.size - 1 // add inst.size because the PC always points to the next instruction
+                                                                    // subtract 1 because the PC points to the current instruction in G6A
         }
         
         // Compute the destination address
@@ -267,6 +284,14 @@ class Assembler
           bankStr = symInfo.bank.prefix
           aa = symInfo.value + op.value - here
           a16 = UInt16(truncatingIfNeeded:aa!)
+          
+          let jInst = theInst as? TypeJ
+          if  jInst != nil && aa! < 0
+          {
+            a16 = UInt16(truncatingIfNeeded:-aa!)
+            jInst?.setBackwards()
+          }
+          
         }
         else
         {
@@ -311,7 +336,7 @@ class Assembler
         {
           let str = String(encoding, radix:2) //binary base
           let padd = String(repeating:"0", count:(16 - str.count))
-          var prStr = String(format:"%05d : %@%@  %@", addr, padd, str, (inst != nil ? String(reflecting:inst!) : "_pfix") )
+          var prStr = String(format:"%05d : %@%@ (%04X) %@", addr, padd, str, encoding, (inst != nil ? String(reflecting:inst!) : "_pfix") )
           if ( aa != nil && isRelative)  { prStr += String(format:"  %@:%+d", bankStr, aa!) }
           if ( aa != nil && !isRelative) { prStr += String(format:"  %@:%05d", bankStr, aa!) }
           out.logln( prStr )
@@ -365,7 +390,7 @@ class Assembler
     // Debug log stuff...
     if out.logEnabled
     {
-      var prStr = String(format:"%05d : ", dataMemory.count)
+      var prStr = String(format:"%05d : ", dataMemory.count/source.dataWidth)
       for i in 0..<bytes.count
       {
         let byte:UInt8 = bytes[i]
@@ -410,11 +435,13 @@ class Assembler
   // Optimize immediates by expanding or shringking into the minimal possible instruction
   func optimizeImmediates() -> Bool
   {
-    let setup = sources[0]
+    let debug = false
+  
+    let setup = sources.last!
     let instend = getInstructionsEnd()
     setup.localSymTable["setupAddr".d]?.value = instend
     setup.localSymTable["dataAddr".d]?.value = 0
-    setup.localSymTable["wordLength".d]?.value = (getConstantDataEnd() + getInitializedVarsEnd()) / 2
+    setup.localSymTable["wordLength".d]?.value = (getConstantDataEnd() + getInitializedVarsEnd()) * dataWidth / 2
   
     // Replace instructions that must be optimized
     
@@ -432,29 +459,39 @@ class Assembler
         
         // We are only interested on intructions with
         // relative offsets or absolute values/addresses
-        if ( theInst != nil && theInst!.refKind.isDisjoint(with:[.relative, .absolute]) == false )
+        if ( theInst != nil && theInst!.refKind.isDisjoint(with:[.relative, .absolute, .immediate]) == false )
         {
-          var here = 0;
+          var here = 0
+          var symValue = 0
           
           if theInst!.refKind.contains(.relative) {
-            here =  source.instructionsOffset + memIdx + instSize } // add instSize because the PC always points to the next instruction
+            here =  source.instructionsOffset + memIdx + instSize - 1 } // add instSize because the PC always points to the next instruction
+                                                                        // subtract 1 because the PC points to the current instruction in G6A
           
           // Compute the destination address
-          assert( inst.symOp != nil, "Instruction should have a symOp" )
+          //assert( inst.symOp != nil, "Instruction should have a symOp" )
           
-          let op = inst.symOp!
-          if let symInfo = getMemoryAddress(sym: op.sym!, src:source) {
-            aa = symInfo.value + op.value - here }
+          let op = inst.exOperand
+          assert( op != nil, "Instruction should have a symOp, or immOp" )
+          
+          if let symData = op!.sym {
+            if let symInfo = getMemoryAddress(sym: symData, src:source) {
+              symValue = symInfo.value
+            }
+          }
+    
+          aa = symValue + op!.value - here
+          
           // Get the acceptable range for this instruction
           let inCoreRange = theInst!.inRange(aa)
           
           // Replace the instruction if appropiate
-          
           if ( inst.hasPfix && inCoreRange ) { inst.hasPfix = false }
-          else if ( !inst.hasPfix && !inCoreRange ) {inst.hasPfix = true }
+          else if ( !inst.hasPfix && !inCoreRange ) { inst.hasPfix = true }
           let instSizeDif = inst.size - instSize
 
-          out.logln( "Optimizing: \((op.sym?.s)!), Value: \(aa), \(instSizeDif != 0 ? "" : "(no change)" ) " )
+          if debug {
+            out.logln( "Optimizing: \( op!.sym != nil ? op!.sym!.s : "<immediate>" ), Value: \(aa), \(instSizeDif != 0 ? "" : "(no change)" ) " )}
 
           // Did we replace the instruction?
           if instSizeDif != 0
@@ -505,7 +542,8 @@ class Assembler
             if symInfo == nil {
               out.exitWithError( "\(source.shortName.s).s Unresolved symbol: " + label.s ) }
           
-            out.log( "Replacing: \(label.s), Value: \(symInfo!.value)" )
+            if debug {
+              out.log( "Replacing: \(label.s), Value: \(symInfo!.value)" )}
           
             switch symInfo!.bank
             {
@@ -513,7 +551,8 @@ class Assembler
               default : out.exitWithError( "Unsuported bank (5)" )
             }
           
-            out.logln( "...New Value: \(symInfo!.value)" )
+            if debug {
+              out.logln( "...New Value: \(symInfo!.value)" )}
           }
         }
         memIdx += inst.size
@@ -545,7 +584,7 @@ class Assembler
       out.logln( prStr )
     }
   
-    assert( dataMemory.count == getConstantDataEnd(),
+    assert( dataMemory.count/2 == getConstantDataEnd(),
             "Data memory length should be equal to constant data end" )
 
     // Generate initialized vars
@@ -557,11 +596,11 @@ class Assembler
     
     if out.logEnabled && getInitializedVarsEnd() == 0
     {
-      let prStr = String(format:"%05d : %d bytes", 0, 0)
+      let prStr = String(format:"%05d : %d bytes", getConstantDataEnd(), 0)
       out.logln( prStr )
     }
   
-    assert( dataMemory.count == getConstantDataEnd() + getInitializedVarsEnd(),
+    assert( dataMemory.count/2 == getConstantDataEnd() + getInitializedVarsEnd(),
             "Data memory length should be equal to initialized vars end" )
   
     // Unitialized variables do not require any machine code, so only some log for them
@@ -569,7 +608,7 @@ class Assembler
     out.logln( "\nUnitialised Variables:" )
     if out.logEnabled
     {
-      let prStr = String(format:"%05d : %d bytes", getConstantDataEnd()+getInitializedVarsEnd(), getUninitializedVarsEnd() )
+      let prStr = String(format:"%05d : %d bytes", getConstantDataEnd()+getInitializedVarsEnd(), getUninitializedVarsEnd()*dataWidth )
       out.logln( prStr )
     }
     
@@ -606,6 +645,23 @@ class Assembler
     // Invoke the assembler
     assembleProgram()
   }
+
+
+  //-------------------------------------------------------------------------------------------
+  // Assemble all sources
+  func getLogisimData() -> Data
+  {
+    var logisimData = Data()
+    logisimData.append( "v2.0 raw".d )
+    
+    for i in stride(from:0, to:programMemory.count, by:2)
+    {
+      let encoding:Int = Int(programMemory[i]) | Int(programMemory[i+1]) << 8
+      logisimData.append( (i % 16 == 0 ? "\n" : " " ).d )
+      logisimData.append( String(format:"%x", encoding ).d )
+    }
+    return logisimData
+  }
+  
+  
 }
-
-

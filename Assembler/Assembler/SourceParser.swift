@@ -108,10 +108,22 @@ class SourceParser:PrimitiveParser
       else { c = svsc }
     }
     
-    // Stack pointer
-    if parseConcreteToken(cStr: "sp".d) || parseConcreteToken(cStr: "SP".d)
+//    // Stack Pointer
+//    if parseConcreteToken(cStr: "sp".d) || parseConcreteToken(cStr: "SP".d)
+//    {
+//      return 11
+//    }
+    
+    // Program Counter
+    if parseConcreteToken(cStr: "pc".d) || parseConcreteToken(cStr: "PC".d)
     {
-      return 11
+      return 7
+    }
+    
+    // Link Register
+    if parseConcreteToken(cStr: "lr".d) || parseConcreteToken(cStr: "LR".d)
+    {
+      return 6
     }
     
     return nil
@@ -260,19 +272,20 @@ class SourceParser:PrimitiveParser
     //-------------------------------------------------------------------------------------------
   func parseCompareInstruction() -> Bool
   {
+    let svc = c
     if let name:Data? = { if self.parseConcreteToken( cStr:"cmp".d ) { return "cmp".d  }
-                          if self.parseConcreteToken( cStr:"cmpc".d ) { return "cmpc".d }
+                          if self.parseConcreteToken( cStr:"cpc".d ) { return "cpc".d }
                           return nil }()
     {
-      currInst = Instruction( name! )
       if parseChar( _dot )
       {
+        currInst = Instruction( name! )
         if parseConditionCode() { return true }
         else { error( "Unrecognized condition code for conditional instruction" ) }
       }
-      else { error( "Expected 'dot' after compare instruction" ) }
+      //else { error( "Expected 'dot' after compare instruction" ) }
     }
-    
+    c = svc;
     return false
   }
 
@@ -322,6 +335,7 @@ class SourceParser:PrimitiveParser
       {
         return token
       }
+      else { error( "Expecting semicolon after address label" ) }
     }
     c = svc;
     return nil;
@@ -660,9 +674,9 @@ class SourceParser:PrimitiveParser
         {
           // Locally defined symbols just need to be added
           // and updated
-          src.addUninitializedVar( size:size, align:align)
+          let location = src.addUninitializedVar( size:size, align:align)
           symInfo.bank = .common
-          symInfo.value = src.getUninitializedVarsEnd()-size
+          symInfo.value = location
         }
         else if let symInfo = asm.globalSymTable[name]
         {
@@ -677,10 +691,10 @@ class SourceParser:PrimitiveParser
           // and initialize accordingly
           let symInfo = SymTableInfo(bank:.common)
           asm.globalSymTable[name] = symInfo
-          src.addUninitializedVar( size:size, align:align)
+          let location = src.addUninitializedVar( size:size, align:align)
           
           // value must be set after adding to take the align into accout
-          symInfo.value = src.getUninitializedVarsEnd()-size
+          symInfo.value = location
         }
         
         // TO DO:
