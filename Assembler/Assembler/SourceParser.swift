@@ -83,7 +83,9 @@ class SourceParser:PrimitiveParser
   //-------------------------------------------------------------------------------------------
   func parseImmediate() -> Int?
   {
-    if let value = parseInteger() {
+    var base = 10
+    if parseRawToken(cStr:"0x".d) || parseRawToken(cStr: "0X".d) { base = 16 }
+    if let value = parseInteger(base:base) {
       return value }
     
     return nil

@@ -435,7 +435,7 @@ class Assembler
   // Optimize immediates by expanding or shringking into the minimal possible instruction
   func optimizeImmediates() -> Bool
   {
-    let debug = false
+    let debug = true
   
     let setup = sources.last!
     let instend = getInstructionsEnd()

@@ -4,7 +4,6 @@
 # ---------------------------------------------
 # main
 # ---------------------------------------------
-
  	.globl	main
 main:
 
@@ -13,40 +12,49 @@ main:
 	mov [&a], r2 
 	mov [&a+1], r3
 
-# Store multiples of a from a*0 to a*9
+# Store multiples of a from a*0 to a*1
 	
-	mov 0, r0
-	mov 0, r1
+	mov 0, r4
 	
-	mov r0, [&X0]      
-	mov r1, [&X0+1]   // x0
+	mov r4, [&X0]      
+	mov r4, [&X0+1]   // x0
 		
-	r0a r2, [&X1]
-	r1a r3, [&X1+1]   // x1
-		
-	r0a r2, [&X2]
-	r1a r3, [&X2+1]   // x2
+	mov r2, [&X1]      
+	mov r3, [&X1+1]   // x1
+	
+# Store multiples of a from a*2 to a*3	
+	
+	dad r2, r2, r0
+	dac r3, r3, r1 
+	mov r0, [&X2]      
+	mov r1, [&X2+1]   // x2
 
-	r0a r2, [&X3]    
-	r1a r3, [&X3+1]   // x3
-		
-	r0a r2, [&X4]    
-	r1a r3, [&X4+1]   // x4
+	dad r0, r2, r0
+	dac r1, r3, r1
+	mov r0, [&X3]    
+	mov r1, [&X3+1]   // x3
 
-	r0a r2, [&X5]    
-	r1a r3, [&X5+1]   // x5
+# Store multiples of a from a*4 to a*9
 
-	r0a r2, [&X6]    
-	r1a r3, [&X6+1]   // x6
-
-	r0a r2, [&X7]    
-	r1a r3, [&X7+1]   // x7
-
-	r0a r2, [&X8]    
-	r1a r3, [&X8+1]   // x8
-
-	r0a r2, [&X9]    
-	r1a r3, [&X9+1]   // x9
+.LXLoop:	
+	dad r0, r2, r0
+	dac r1, r3, r1
+	mov r0, [r4, &X4]    
+	mov r1, [r4, &X4+1]    // x4, x7
+	
+	dad r0, r2, r0
+	dac r1, r3, r1     
+	mov r0, [r4, &X5]  
+	mov r1, [r4, &X5+1]    // x5, x8
+	
+	dad r0, r2, r0
+	dac r1, r3, r1     
+	mov r0, [r4, &X6]  
+	mov r1, [r4, &X6+1]    // x6, x9
+	
+	add 6, r4
+	cmp 12, r4  // loop two times
+	bf .LXLoop
 	 
 # r0:r1 will become the result
 	
