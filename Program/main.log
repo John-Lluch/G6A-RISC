@@ -8,49 +8,53 @@ main:
 	mov [a+1], r3
 	mov 0, r0
 	mov 0, r1
-	mov r0, [X0]
-	mov r1, [X0+1]
-	r0a r2, [X1]
-	r1a r3, [X1+1]
-	r0a r2, [X2]
-	r1a r3, [X2+1]
-	r0a r2, [X3]
-	r1a r3, [X3+1]
-	r0a r2, [X4]
-	r1a r3, [X4+1]
-	r0a r2, [X5]
-	r1a r3, [X5+1]
-	r0a r2, [X6]
-	r1a r3, [X6+1]
-	r0a r2, [X7]
-	r1a r3, [X7+1]
-	r0a r2, [X8]
-	r1a r3, [X8+1]
-	r0a r2, [X9]
-	r1a r3, [X9+1]
+	mov X0, r4
+	mov r0, [r4, 0]
+	mov r1, [r4, 1]
+	r0a r2, [r4, 2]
+	r1a r3, [r4, 3]
+	r0a r2, [r4, 4]
+	r1a r3, [r4, 5]
+	r0a r2, [r4, 6]
+	r1a r3, [r4, 7]
+	r0a r2, [r4, 8]
+	r1a r3, [r4, 9]
+	r0a r2, [r4, 10]
+	r1a r3, [r4, 11]
+	r0a r2, [r4, 12]
+	r1a r3, [r4, 13]
+	r0a r2, [r4, 14]
+	r1a r3, [r4, 15]
+	r0a r2, [r4, 16]
+	r1a r3, [r4, 17]
+	r0a r2, [r4, 18]
+	r1a r3, [r4, 19]
 	mov 0, r0
 	mov 0, r1
 	mov [b], r2
 	mov [b+1], r3
-	mov 4, r5
+	mov 4, r6
+	mov r4, r5
 .LMLoop:
-	rr4 r0, r1, r0
-	sr4 r1, r1
 	sl1 r2, r4
 	and 31, r4
-	dad [r4, X0], r0
-	dac [r4, X0+1], r1
-	rr4 r2, r3, r2
-	sr4 r3, r3
+	add r5, r4, r4
 	rr4 r0, r1, r0
 	sr4 r1, r1
-	sl1 r2, r4
-	and 31, r4
-	dad [r4, X0], r0
-	dac [r4, X0+1], r1
+	dad [r4, 0], r0
+	dac [r4, 1], r1
 	rr4 r2, r3, r2
 	sr4 r3, r3
-	sub 1, r5
+	sl1 r2, r4
+	and 31, r4
+	add r5, r4, r4
+	rr4 r0, r1, r0
+	sr4 r1, r1
+	dad [r4, 0], r0
+	dac [r4, 1], r1
+	rr4 r2, r3, r2
+	sr4 r3, r3
+	sub 1, r6
 	bf .LMLoop
 	mov r0, [result]
 	mov r1, [result+1]
@@ -87,155 +91,103 @@ setup:
 .LL1:
 	j main
 
-Optimizing: setup, Value: 82, (no change) 
+Optimizing: setup, Value: 63, (no change) 
 Optimizing: a, Value: 0,  
 Optimizing: a, Value: 1,  
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
-Optimizing: X0, Value: 5,  
-Optimizing: X0, Value: 6,  
-Optimizing: X1, Value: 7,  
-Optimizing: X1, Value: 8,  
-Optimizing: X2, Value: 9,  
-Optimizing: X2, Value: 10,  
-Optimizing: X3, Value: 11,  
-Optimizing: X3, Value: 12,  
-Optimizing: X4, Value: 13,  
-Optimizing: X4, Value: 14,  
-Optimizing: X5, Value: 15,  
-Optimizing: X5, Value: 16,  
-Optimizing: X6, Value: 17,  
-Optimizing: X6, Value: 18,  
-Optimizing: X7, Value: 19,  
-Optimizing: X7, Value: 20,  
-Optimizing: X8, Value: 21,  
-Optimizing: X8, Value: 22,  
-Optimizing: X9, Value: 23,  
-Optimizing: X9, Value: 24,  
+Optimizing: X0, Value: 32, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 4, (no change) 
+Optimizing: <immediate>, Value: 5, (no change) 
+Optimizing: <immediate>, Value: 6, (no change) 
+Optimizing: <immediate>, Value: 7, (no change) 
+Optimizing: <immediate>, Value: 8, (no change) 
+Optimizing: <immediate>, Value: 9, (no change) 
+Optimizing: <immediate>, Value: 10, (no change) 
+Optimizing: <immediate>, Value: 11, (no change) 
+Optimizing: <immediate>, Value: 12, (no change) 
+Optimizing: <immediate>, Value: 13, (no change) 
+Optimizing: <immediate>, Value: 14, (no change) 
+Optimizing: <immediate>, Value: 15, (no change) 
+Optimizing: <immediate>, Value: 16, (no change) 
+Optimizing: <immediate>, Value: 17, (no change) 
+Optimizing: <immediate>, Value: 18, (no change) 
+Optimizing: <immediate>, Value: 19, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: b, Value: 2,  
 Optimizing: b, Value: 3,  
 Optimizing: <immediate>, Value: 4, (no change) 
 Optimizing: <immediate>, Value: 31, (no change) 
-Optimizing: X0, Value: 5,  
-Optimizing: X0, Value: 6,  
-Optimizing: <immediate>, Value: 31, (no change) 
-Optimizing: X0, Value: 5,  
-Optimizing: X0, Value: 6,  
+Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: <immediate>, Value: 1, (no change) 
-Optimizing: .LMLoop, Value: -21, (no change) 
+Optimizing: <immediate>, Value: 31, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LMLoop, Value: -19, (no change) 
 Optimizing: result, Value: 4,  
 Optimizing: result, Value: 5,  
-Optimizing: setupAddr, Value: 97, (no change) 
+Optimizing: setupAddr, Value: 78, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: wordLength, Value: 4,  
-Optimizing: .LL1, Value: 37,  
+Optimizing: .LL1, Value: 13, (no change) 
 Optimizing: dataAddr, Value: 0,  
 Optimizing: <immediate>, Value: 1, (no change) 
 Optimizing: <immediate>, Value: 1, (no change) 
-Optimizing: .LL0, Value: 23, (no change) 
+Optimizing: .LL0, Value: -1, (no change) 
 Optimizing: main, Value: 2,  
 Replacing: main, Value: 2...New Value: 2
-Replacing: .LMLoop, Value: 55...New Value: 31
-Replacing: setup, Value: 82...New Value: 52
-Replacing: .LL0, Value: 87...New Value: 56
-Replacing: .LL1, Value: 95...New Value: 64
-Optimizing: setup, Value: 52, (no change) 
+Replacing: .LMLoop, Value: 38...New Value: 34
+Replacing: setup, Value: 63...New Value: 57
+Replacing: .LL0, Value: 68...New Value: 61
+Replacing: .LL1, Value: 76...New Value: 68
+Optimizing: setup, Value: 57, (no change) 
 Optimizing: a, Value: 0, (no change) 
 Optimizing: a, Value: 1, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
-Optimizing: X0, Value: 5, (no change) 
-Optimizing: X0, Value: 6, (no change) 
-Optimizing: X1, Value: 7, (no change) 
-Optimizing: X1, Value: 8, (no change) 
-Optimizing: X2, Value: 9, (no change) 
-Optimizing: X2, Value: 10, (no change) 
-Optimizing: X3, Value: 11, (no change) 
-Optimizing: X3, Value: 12, (no change) 
-Optimizing: X4, Value: 13, (no change) 
-Optimizing: X4, Value: 14, (no change) 
-Optimizing: X5, Value: 15, (no change) 
-Optimizing: X5, Value: 16, (no change) 
-Optimizing: X6, Value: 17, (no change) 
-Optimizing: X6, Value: 18, (no change) 
-Optimizing: X7, Value: 19, (no change) 
-Optimizing: X7, Value: 20, (no change) 
-Optimizing: X8, Value: 21, (no change) 
-Optimizing: X8, Value: 22, (no change) 
-Optimizing: X9, Value: 23, (no change) 
-Optimizing: X9, Value: 24, (no change) 
+Optimizing: X0, Value: 32, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 4, (no change) 
+Optimizing: <immediate>, Value: 5, (no change) 
+Optimizing: <immediate>, Value: 6, (no change) 
+Optimizing: <immediate>, Value: 7, (no change) 
+Optimizing: <immediate>, Value: 8, (no change) 
+Optimizing: <immediate>, Value: 9, (no change) 
+Optimizing: <immediate>, Value: 10, (no change) 
+Optimizing: <immediate>, Value: 11, (no change) 
+Optimizing: <immediate>, Value: 12, (no change) 
+Optimizing: <immediate>, Value: 13, (no change) 
+Optimizing: <immediate>, Value: 14, (no change) 
+Optimizing: <immediate>, Value: 15, (no change) 
+Optimizing: <immediate>, Value: 16, (no change) 
+Optimizing: <immediate>, Value: 17, (no change) 
+Optimizing: <immediate>, Value: 18, (no change) 
+Optimizing: <immediate>, Value: 19, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: b, Value: 2, (no change) 
 Optimizing: b, Value: 3, (no change) 
 Optimizing: <immediate>, Value: 4, (no change) 
 Optimizing: <immediate>, Value: 31, (no change) 
-Optimizing: X0, Value: 5, (no change) 
-Optimizing: X0, Value: 6, (no change) 
-Optimizing: <immediate>, Value: 31, (no change) 
-Optimizing: X0, Value: 5, (no change) 
-Optimizing: X0, Value: 6, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: <immediate>, Value: 1, (no change) 
-Optimizing: .LMLoop, Value: -17, (no change) 
+Optimizing: <immediate>, Value: 31, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LMLoop, Value: -19, (no change) 
 Optimizing: result, Value: 4, (no change) 
 Optimizing: result, Value: 5, (no change) 
-Optimizing: setupAddr, Value: 65, (no change) 
-Optimizing: <immediate>, Value: 0, (no change) 
-Optimizing: wordLength, Value: 4, (no change) 
-Optimizing: .LL1, Value: 6,  
-Optimizing: dataAddr, Value: 0, (no change) 
-Optimizing: <immediate>, Value: 1, (no change) 
-Optimizing: <immediate>, Value: 1, (no change) 
-Optimizing: .LL0, Value: -7, (no change) 
-Optimizing: main, Value: 2, (no change) 
-Replacing: main, Value: 2...New Value: 2
-Replacing: .LMLoop, Value: 31...New Value: 31
-Replacing: setup, Value: 52...New Value: 52
-Replacing: .LL0, Value: 56...New Value: 56
-Replacing: .LL1, Value: 64...New Value: 63
-Optimizing: setup, Value: 52, (no change) 
-Optimizing: a, Value: 0, (no change) 
-Optimizing: a, Value: 1, (no change) 
-Optimizing: <immediate>, Value: 0, (no change) 
-Optimizing: <immediate>, Value: 0, (no change) 
-Optimizing: X0, Value: 5, (no change) 
-Optimizing: X0, Value: 6, (no change) 
-Optimizing: X1, Value: 7, (no change) 
-Optimizing: X1, Value: 8, (no change) 
-Optimizing: X2, Value: 9, (no change) 
-Optimizing: X2, Value: 10, (no change) 
-Optimizing: X3, Value: 11, (no change) 
-Optimizing: X3, Value: 12, (no change) 
-Optimizing: X4, Value: 13, (no change) 
-Optimizing: X4, Value: 14, (no change) 
-Optimizing: X5, Value: 15, (no change) 
-Optimizing: X5, Value: 16, (no change) 
-Optimizing: X6, Value: 17, (no change) 
-Optimizing: X6, Value: 18, (no change) 
-Optimizing: X7, Value: 19, (no change) 
-Optimizing: X7, Value: 20, (no change) 
-Optimizing: X8, Value: 21, (no change) 
-Optimizing: X8, Value: 22, (no change) 
-Optimizing: X9, Value: 23, (no change) 
-Optimizing: X9, Value: 24, (no change) 
-Optimizing: <immediate>, Value: 0, (no change) 
-Optimizing: <immediate>, Value: 0, (no change) 
-Optimizing: b, Value: 2, (no change) 
-Optimizing: b, Value: 3, (no change) 
-Optimizing: <immediate>, Value: 4, (no change) 
-Optimizing: <immediate>, Value: 31, (no change) 
-Optimizing: X0, Value: 5, (no change) 
-Optimizing: X0, Value: 6, (no change) 
-Optimizing: <immediate>, Value: 31, (no change) 
-Optimizing: X0, Value: 5, (no change) 
-Optimizing: X0, Value: 6, (no change) 
-Optimizing: <immediate>, Value: 1, (no change) 
-Optimizing: .LMLoop, Value: -17, (no change) 
-Optimizing: result, Value: 4, (no change) 
-Optimizing: result, Value: 5, (no change) 
-Optimizing: setupAddr, Value: 64, (no change) 
+Optimizing: setupAddr, Value: 69, (no change) 
 Optimizing: <immediate>, Value: 0, (no change) 
 Optimizing: wordLength, Value: 4, (no change) 
 Optimizing: .LL1, Value: 6, (no change) 
@@ -255,85 +207,90 @@ Initialised Variables:
 00002 : 0x70,0x56,0x34,0x12  305419888  :305419888
 
 Unitialised Variables:
-00004 : 42 bytes
+00004 : 96 bytes
 
 -----
 file:/Users/joan/Documents-Local/Relay/G6A-RISC/Program/main.g6a
 
 Source: start
-00000 : 0000000000000001 (0001) _pfix  Program:00052
-00001 : 1101111100010100 (DF14) j setup  Program:00052
+00000 : 0000000000000001 (0001) _pfix  Program:00057
+00001 : 1101111100011001 (DF19) j setup  Program:00057
 
 Source: main.s
 00002 : 0101101000000000 (5A00) mov [a], r2  Data:00000
 00003 : 0101101100000001 (5B01) mov [a+1], r3  Data:00001
 00004 : 1101100000000000 (D800) mov 0, r0
 00005 : 1101100100000000 (D900) mov 0, r1
-00006 : 0101100000100101 (5825) mov r0, [X0]  Data:00005
-00007 : 0101100100100110 (5926) mov r1, [X0+1]  Data:00006
-00008 : 0011001000000111 (3207) r0a r2, [X1]  Data:00007
-00009 : 0011101100001000 (3B08) r1a r3, [X1+1]  Data:00008
-00010 : 0011001000001001 (3209) r0a r2, [X2]  Data:00009
-00011 : 0011101100001010 (3B0A) r1a r3, [X2+1]  Data:00010
-00012 : 0011001000001011 (320B) r0a r2, [X3]  Data:00011
-00013 : 0011101100001100 (3B0C) r1a r3, [X3+1]  Data:00012
-00014 : 0011001000001101 (320D) r0a r2, [X4]  Data:00013
-00015 : 0011101100001110 (3B0E) r1a r3, [X4+1]  Data:00014
-00016 : 0011001000001111 (320F) r0a r2, [X5]  Data:00015
-00017 : 0011101100010000 (3B10) r1a r3, [X5+1]  Data:00016
-00018 : 0011001000010001 (3211) r0a r2, [X6]  Data:00017
-00019 : 0011101100010010 (3B12) r1a r3, [X6+1]  Data:00018
-00020 : 0011001000010011 (3213) r0a r2, [X7]  Data:00019
-00021 : 0011101100010100 (3B14) r1a r3, [X7+1]  Data:00020
-00022 : 0011001000010101 (3215) r0a r2, [X8]  Data:00021
-00023 : 0011101100010110 (3B16) r1a r3, [X8+1]  Data:00022
-00024 : 0011001000010111 (3217) r0a r2, [X9]  Data:00023
-00025 : 0011101100011000 (3B18) r1a r3, [X9+1]  Data:00024
-00026 : 1101100000000000 (D800) mov 0, r0
-00027 : 1101100100000000 (D900) mov 0, r1
-00028 : 0101101000000010 (5A02) mov [b], r2  Data:00002
-00029 : 0101101100000011 (5B03) mov [b+1], r3  Data:00003
-00030 : 1101110100000100 (DD04) mov 4, r5
-00031 : 1000000011000001 (80C1) rr4 r0, r1, r0
-00032 : 1000000110001000 (8188) sr4 r1, r1
-00033 : 1000110000010000 (8C10) sl1 r2, r4
-00034 : 1111010001011111 (F45F) and 31, r4
-00035 : 0011000001000101 (3045) dad [r4, X0], r0  Data:00005
-00036 : 0011100101000110 (3946) dac [r4, X0+1], r1  Data:00006
-00037 : 1000001011010011 (82D3) rr4 r2, r3, r2
-00038 : 1000001110011000 (8398) sr4 r3, r3
-00039 : 1000000011000001 (80C1) rr4 r0, r1, r0
-00040 : 1000000110001000 (8188) sr4 r1, r1
-00041 : 1000110000010000 (8C10) sl1 r2, r4
-00042 : 1111010001011111 (F45F) and 31, r4
-00043 : 0011000001000101 (3045) dad [r4, X0], r0  Data:00005
-00044 : 0011100101000110 (3946) dac [r4, X0+1], r1  Data:00006
-00045 : 1000001011010011 (82D3) rr4 r2, r3, r2
-00046 : 1000001110011000 (8398) sr4 r3, r3
-00047 : 1110010101000001 (E541) sub 1, r5
-00048 : 1110111111010001 (EFD1) bf .LMLoop  Program:-17
-00049 : 0101100000100100 (5824) mov r0, [result]  Data:00004
-00050 : 0101100100100101 (5925) mov r1, [result+1]  Data:00005
-00051 : 0000100000000000 (0800) hlt
+00006 : 0000000000000001 (0001) _pfix  Data:00032
+00007 : 1101110000000000 (DC00) mov X0, r4  Data:00032
+00008 : 0001100001100000 (1860) mov r0, [r4, 0]
+00009 : 0001100101100001 (1961) mov r1, [r4, 1]
+00010 : 0011001000000010 (3202) r0a r2, [r4, 2]
+00011 : 0011101100000011 (3B03) r1a r3, [r4, 3]
+00012 : 0011001000000100 (3204) r0a r2, [r4, 4]
+00013 : 0011101100000101 (3B05) r1a r3, [r4, 5]
+00014 : 0011001000000110 (3206) r0a r2, [r4, 6]
+00015 : 0011101100000111 (3B07) r1a r3, [r4, 7]
+00016 : 0011001000001000 (3208) r0a r2, [r4, 8]
+00017 : 0011101100001001 (3B09) r1a r3, [r4, 9]
+00018 : 0011001000001010 (320A) r0a r2, [r4, 10]
+00019 : 0011101100001011 (3B0B) r1a r3, [r4, 11]
+00020 : 0011001000001100 (320C) r0a r2, [r4, 12]
+00021 : 0011101100001101 (3B0D) r1a r3, [r4, 13]
+00022 : 0011001000001110 (320E) r0a r2, [r4, 14]
+00023 : 0011101100001111 (3B0F) r1a r3, [r4, 15]
+00024 : 0011001000010000 (3210) r0a r2, [r4, 16]
+00025 : 0011101100010001 (3B11) r1a r3, [r4, 17]
+00026 : 0011001000010010 (3212) r0a r2, [r4, 18]
+00027 : 0011101100010011 (3B13) r1a r3, [r4, 19]
+00028 : 1101100000000000 (D800) mov 0, r0
+00029 : 1101100100000000 (D900) mov 0, r1
+00030 : 0101101000000010 (5A02) mov [b], r2  Data:00002
+00031 : 0101101100000011 (5B03) mov [b+1], r3  Data:00003
+00032 : 1101111000000100 (DE04) mov 4, r6
+00033 : 1001110100000100 (9D04) mov r4, r5
+00034 : 1000110000010000 (8C10) sl1 r2, r4
+00035 : 1111010001011111 (F45F) and 31, r4
+00036 : 1010010000101100 (A42C) add r5, r4, r4
+00037 : 1000000011000001 (80C1) rr4 r0, r1, r0
+00038 : 1000000110001000 (8188) sr4 r1, r1
+00039 : 0011000001000000 (3040) dad [r4, 0], r0
+00040 : 0011100101000001 (3941) dac [r4, 1], r1
+00041 : 1000001011010011 (82D3) rr4 r2, r3, r2
+00042 : 1000001110011000 (8398) sr4 r3, r3
+00043 : 1000110000010000 (8C10) sl1 r2, r4
+00044 : 1111010001011111 (F45F) and 31, r4
+00045 : 1010010000101100 (A42C) add r5, r4, r4
+00046 : 1000000011000001 (80C1) rr4 r0, r1, r0
+00047 : 1000000110001000 (8188) sr4 r1, r1
+00048 : 0011000001000000 (3040) dad [r4, 0], r0
+00049 : 0011100101000001 (3941) dac [r4, 1], r1
+00050 : 1000001011010011 (82D3) rr4 r2, r3, r2
+00051 : 1000001110011000 (8398) sr4 r3, r3
+00052 : 1110011001000001 (E641) sub 1, r6
+00053 : 1110111111010011 (EFD3) bf .LMLoop  Program:-19
+00054 : 0101100000100100 (5824) mov r0, [result]  Data:00004
+00055 : 0101100100100101 (5925) mov r1, [result+1]  Data:00005
+00056 : 0000100000000000 (0800) hlt
 
 Source: setup
-00052 : 0000000000000010 (0002) _pfix  :00064
-00053 : 1101100000000000 (D800) mov setupAddr, r0  :00064
-00054 : 1101110000000000 (DC00) mov 0, r4
-00055 : 1101100100000100 (D904) mov wordLength, r1  :00004
-00056 : 1001000000001100 (900C) cmp eq, r1, r4
-00057 : 1110011110000110 (E786) bt .LL1  Program:+6
-00058 : 0001101100000000 (1B00) lp [r0], r3
-00059 : 0001101101100000 (1B60) mov r3, [r4, dataAddr]  :00000
-00060 : 1110000000000001 (E001) add 1, r0
-00061 : 1110010000000001 (E401) add 1, r4
-00062 : 1110011101000110 (E746) b .LL0  Program:-6
-00063 : 1101111100000010 (DF02) j main  Program:00002
+00057 : 0000000000000010 (0002) _pfix  :00069
+00058 : 1101100000000101 (D805) mov setupAddr, r0  :00069
+00059 : 1101110000000000 (DC00) mov 0, r4
+00060 : 1101100100000100 (D904) mov wordLength, r1  :00004
+00061 : 1001000000001100 (900C) cmp eq, r1, r4
+00062 : 1110011110000110 (E786) bt .LL1  Program:+6
+00063 : 0001101100000000 (1B00) lp [r0], r3
+00064 : 0001101101100000 (1B60) mov r3, [r4, dataAddr]  :00000
+00065 : 1110000000000001 (E001) add 1, r0
+00066 : 1110010000000001 (E401) add 1, r4
+00067 : 1110011101000110 (E746) b .LL0  Program:-6
+00068 : 1101111100000010 (DF02) j main  Program:00002
 
 Source: setupData
-00064 : 0110011110001001 (6789) _imm 26505
-00065 : 0000010101010101 (0555) _imm 1365
-00066 : 0101011001110000 (5670) _imm 22128
-00067 : 0001001000110100 (1234) _imm 4660
+00069 : 0110011110001001 (6789) _imm 26505
+00070 : 0000010101010101 (0555) _imm 1365
+00071 : 0101011001110000 (5670) _imm 22128
+00072 : 0001001000110100 (1234) _imm 4660
 
 Assembly completed

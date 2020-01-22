@@ -230,6 +230,7 @@ class TypeM_ex0:TypeM
 class TypeM_exR:TypeM
 {
   required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
+    // FIX ME: second operand is ignored, this may lead to user confusion or misleading instruction behaviour
     self.init( op:op, rk:7, s:0, ri:ops[1].u16value, a:ops[0].u16value,  kind:kind )
   }
 }
@@ -238,7 +239,7 @@ class TypeM_exR:TypeM
 class TypeM_exI:TypeM
 {
   required convenience init(op:UInt16, fn:UInt16, ops:[Operand], kind:ReferenceKind = []) {
-    self.init( op:op, rk:7, s:0, ri:ops[0].u16value, a:ops[1].u16value,  kind:kind )
+    self.init( op:op, rk:7, s:0, ri:ops[0].u16value, a:ops[2].u16value,  kind:kind )
   }
 }
 
@@ -321,8 +322,11 @@ class MachineInstrList
     Instruction( "lp".d,     [OpReg(.indirect), OpReg()] )                      : (ty:TypeM_exR.self,  kind:[], op:0b011, fn:0),
     Instruction( "--1".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b100, fn:0),
     Instruction( "--2".d,    [] )                                               : (ty:TypeM_ex0.self,  kind:[], op:0b101, fn:0),
-    Instruction( "r0a".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeM_exI.self,  kind:[.absolute], op:0b110, fn:0),
-    Instruction( "r1a".d,    [OpReg(), OpSym(.indirect)] )                      : (ty:TypeM_exI.self,  kind:[.absolute], op:0b111, fn:0),
+    Instruction( "r0a".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_exI.self,  kind:[.absolute], op:0b110, fn:0),
+    Instruction( "r1a".d,    [OpReg(), OpReg(.indirect), OpSym(.indirect)] )    : (ty:TypeM_exI.self,  kind:[.absolute], op:0b111, fn:0),
+    
+    Instruction( "r0a".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_exI.self,  kind:[.immediate], op:0b110, fn:0),
+    Instruction( "r1a".d,    [OpReg(), OpReg(.indirect), OpImm(.indirect)] )    : (ty:TypeM_exI.self,  kind:[.immediate], op:0b111, fn:0),
   
     // Type M load
     

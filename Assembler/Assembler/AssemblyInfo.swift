@@ -70,6 +70,12 @@ class OpReg : Operand
   override var debugDescription: String { return "r\(value)" }
 }
 
+class OpA0 : OpReg
+{
+  // Description string for logging purposes
+  override var debugDescription: String { return "A0" }
+}
+
 class OpSP : OpReg
 {
   // Description string for logging purposes
@@ -350,7 +356,7 @@ class Source
   func addInitializedVar( _ value:DataValue )
   {
     initializedVars.append(value)
-    assert( value.byteSize % dataWidth == 0, "Data size must be multiple of two" )
+    assert( value.byteSize % dataWidth == 0, "Data size must be multiple of data width" )
     initializedVarsEnd += value.byteSize/dataWidth
   }
   
@@ -364,8 +370,12 @@ class Source
   // Adds a memory slot for an unitialized variable
   func addUninitializedVar( size:Int, align:Int  ) -> Int
   {
-    uninitializedVarsEnd += uninitializedVarsEnd % (align/dataWidth)
-    assert( size % dataWidth == 0, "Data size must be multiple of two" )
+    // align is expressed in bytes, it must be a power of two
+    assert ( (align & (align-1)) == 0, "Align must be a power of two" )
+    let filled = constantDatasEnd + initializedVarsEnd
+    let aligned = (filled*dataWidth + uninitializedVarsEnd*dataWidth + align - 1) & ~(align-1)
+    uninitializedVarsEnd = aligned/dataWidth - filled
+    assert( size % dataWidth == 0, "Data size must be multiple of dataWidth" )
     let location = uninitializedVarsEnd
     uninitializedVarsEnd += size/dataWidth
     return location

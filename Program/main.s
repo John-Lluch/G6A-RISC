@@ -18,35 +18,37 @@ main:
 	mov 0, r0
 	mov 0, r1
 	
-	mov r0, [&X0]      
-	mov r1, [&X0+1]   // x0
+	mov &X0, r4
+	
+	mov r0, [r4, 0]      
+	mov r1, [r4, 1]   // x0
 		
-	r0a r2, [&X1]
-	r1a r3, [&X1+1]   // x1
+	r0a r2, [r4, 2]
+	r1a r3, [r4, 3]   // x1
 		
-	r0a r2, [&X2]
-	r1a r3, [&X2+1]   // x2
+	r0a r2, [r4, 4]
+	r1a r3, [r4, 5]   // x2
 
-	r0a r2, [&X3]    
-	r1a r3, [&X3+1]   // x3
+	r0a r2, [r4, 6]    
+	r1a r3, [r4, 7]   // x3
 		
-	r0a r2, [&X4]    
-	r1a r3, [&X4+1]   // x4
+	r0a r2, [r4, 8]    
+	r1a r3, [r4, 9]   // x4
 
-	r0a r2, [&X5]    
-	r1a r3, [&X5+1]   // x5
+	r0a r2, [r4, 10]    
+	r1a r3, [r4, 11]   // x5
 
-	r0a r2, [&X6]    
-	r1a r3, [&X6+1]   // x6
+	r0a r2, [r4, 12]    
+	r1a r3, [r4, 13]   // x6
 
-	r0a r2, [&X7]    
-	r1a r3, [&X7+1]   // x7
+	r0a r2, [r4, 14]    
+	r1a r3, [r4, 15]   // x7
 
-	r0a r2, [&X8]    
-	r1a r3, [&X8+1]   // x8
+	r0a r2, [r4, 16]    
+	r1a r3, [r4, 17]   // x8
 
-	r0a r2, [&X9]    
-	r1a r3, [&X9+1]   // x9
+	r0a r2, [r4, 18]    
+	r1a r3, [r4, 19]   // x9
 	 
 # r0:r1 will become the result
 	
@@ -60,37 +62,39 @@ main:
 	
 # Loop 4 times
 
-	mov 4, r5
+	mov 4, r6
+	mov r4, r5
 	
 .LMLoop:
 	
-	rr4 r0, r1, r0     
-	sr4 r1, r1         // Shift result one digit
-	
 	sl1 r2, r4
 	and 0x1f, r4      // Find the index to the x0-x9 multiple
+	add r5, r4, r4
 	
-	dad [r4, &X0], r0
-	dac [r4, &X0+1], r1  // multiply the right-most digit of b
+	rr4 r0, r1, r0     
+	sr4 r1, r1         // Shift result one digit
+	dad [r4, 0], r0
+	dac [r4, 1], r1  // multiply the right-most digit of b
 	
 	rr4 r2, r3, r2     
 	sr4 r3, r3         // Shift b one digit
 	
 # next digit
-	
-	rr4 r0, r1, r0     
-	sr4 r1, r1         // Shift result one digit
-	
+
 	sl1 r2, r4
 	and 0x1f, r4       // Find the index to the x0-x9 multiple
+	add r5, r4, r4
 	
-	dad [r4, &X0], r0
-	dac [r4, &X0+1], r1  // multiply the right-most digit of b
+	rr4 r0, r1, r0    
+	sr4 r1, r1         // Shift result one digit 
+	
+	dad [r4, 0], r0
+	dac [r4, 1], r1  // multiply the right-most digit of b
 	
 	rr4 r2, r3, r2     
 	sr4 r3, r3         // shift b one digit
 	
-	sub 1, r5         // decrement counter
+	sub 1, r6         // decrement counter
 	bf .LMLoop        // next digit
 	
 # store the result
@@ -100,6 +104,32 @@ main:
 	
 	hlt
 
+
+# AddSubroutine:
+# 	sub 32, r5               // reserve frame space
+# 	mov r6, [r5, 31]          // store return address, [r5,0] to [r5,30] are available for local vars
+# 	add r0, r1, r0           // perform addition
+# 	add 32, r5               // restore the caller stack frame
+# 	mov [r5, 1], PC          // return to caller
+# 
+# ProgramEntry:
+# 	mov [&stackADDR+1024], r5  // set r5 to the top of the stack, r5 becomes the stack pointer
+# 	mov 100, r0                // set r0 to 100
+# 	mov 3, r1                  // set r1 to 2
+# 	jl @AddSubroutine           // call AddSubroutine to perform addition
+# 	mov r0, [&result]          // store the result in memory
+# 	hlt                        // stop execution
+# 
+# 	.data
+# stackADDR:
+# 	.short stack           // initialise stackADDR with the address of the reserved stack area
+
+#	.comm result,2,2        // reserve space in data memory for result
+#	.comm stack, 1024, 64   // reserve 1024 bytes of 64-byte aligned data space for the stack 
+
+
+
+
 # ---------------------------------------------
 # Global Data
 # ---------------------------------------------
@@ -107,8 +137,8 @@ main:
 	.data
 a:	.long 0x05556789
 b:	.long 0x12345670
-	.comm result,2,2
-	.comm X0,4,2
+	.comm result,4,2
+	.comm X0,4,64          // table of multiples needs 40 bytes, aligned to 64 bytes
 	.comm X1,4,2
 	.comm X2,4,2
 	.comm X3,4,2
@@ -118,6 +148,7 @@ b:	.long 0x12345670
 	.comm X7,4,2
 	.comm X8,4,2
 	.comm X9,4,2
+	
 
 
 # 	mov [&a], r1      // get multiplier
