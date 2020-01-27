@@ -62,29 +62,29 @@ class Machine
   func rr1()  { q = alu.sr1(a, b) }
   func rl1()  { q = alu.rl1(a, b) }
   func cpc()  { wi_r = true ; q = alu.cpc(cc, a, b) }
-  func set()  { q = alu.sr.t ? alu.ldb(a, b) : 0 }
+  func mvl()  { reg[6] = reg[7] ; q = alu.ldb(a, b) }
   func sub()  { q = alu.sub(a, b) }
   func sbc()  { q = alu.sbc(a, b) }
-  func and()  { q = alu.and(a, b) }
+  func dsb()  { q = alu.dsb(a, b) }
   func dsc()  { q = alu.dsc(a, b) }
   
   func sr4()  { q = alu.sr4(a, b) }
   func sl4()  { q = alu.sl4(a, b)}
+  func set()  { q = alu.sr.t ? alu.ldb(a, b) : 0 }
   func __0()  {  }
-  func sef()  { q = !alu.sr.t ? alu.ldb(a, b) : 0 }
-  func adt()  { wi_r = !alu.sr.t ; q = alu.add(a, b) }
-  func adf()  { wi_r = alu.sr.t ; q = alu.add(a, b) }
+  func adt()  { wi_r = !alu.sr.t ; q = alu.adda(a, b) }
+  func adf()  { wi_r = alu.sr.t ; q = alu.adda(a, b) }
   func or ()  { q = alu.or(a, b)  }
-  func rsb()  { q = alu.rsb(a, b)  }
+  func and()  { q = alu.and(a, b) }
   
   func rr4()  { q = alu.rr4(a, b) }
   func rl4()  { q = alu.rl4(a, b) }
-  func __1()  {  }
+  func sef()  { q = !alu.sr.t ? alu.ldb(a, b) : 0 }
   func sel()  { q = alu.sr.t ? alu.ldb(a, b) : alu.lda(a, b) }
-  func sbt()  { wi_r = !alu.sr.t ; q = alu.sub(a, b) }
-  func sbf()  { wi_r = alu.sr.t ; q = alu.sub(a, b) }
+  func sbt()  { wi_r = !alu.sr.t ; q = alu.suba(a, b) }
+  func sbf()  { wi_r = alu.sr.t ; q = alu.suba(a, b) }
   func xor()  { q = alu.xor(a, b) }
-  func mvl()  { reg[6] = reg[7] ; q = alu.ldb(a, b) }
+  func rsb()  { q = alu.rsb(a, b)  }
   
   func pfx()  { ie_pfr = true }
   func hlt()  { mc_halt = true }
@@ -111,29 +111,29 @@ class Machine
     0b01_000 : rr1,
     0b01_001 : rl1,
     0b01_010 : cpc,
-    0b01_011 : set,
+    0b01_011 : mvl,
     0b01_100 : sub,
     0b01_101 : sbc,
-    0b01_110 : and ,
+    0b01_110 : dsb ,
     0b01_111 : dsc,
     
     0b10_000 : sr4,
     0b10_001 : sl4,
-    0b10_010 : __0,
-    0b10_011 : sef,
+    0b10_010 : set,
+    0b10_011 : __0,
     0b10_100 : adt,
     0b10_101 : adf,
     0b10_110 : or,
-    0b10_111 : rsb,
+    0b10_111 : and,
     
     0b11_000 : rr4,
     0b11_001 : rl4,
-    0b11_010 : __1,
+    0b11_010 : sef,
     0b11_011 : sel,
     0b11_100 : sbt,
     0b11_101 : sbf,
     0b11_110 : xor,
-    0b11_111 : mvl,
+    0b11_111 : rsb,
   ]
   
   let instr_ex:Dictionary<UInt16, (Machine)->()->() > =

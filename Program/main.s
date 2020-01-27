@@ -137,7 +137,7 @@ main:
 	.data
 a:	.long 0x05556789
 b:	.long 0x12345670
-	.comm result,4,2
+	.comm result,4,2       // reserve space in data memory for result
 	.comm X0,4,64          // table of multiples needs 40 bytes, aligned to 64 bytes
 	.comm X1,4,2
 	.comm X2,4,2

@@ -227,18 +227,20 @@ class ALU
   func ldb ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { return b }
   
   func add ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = adder(a,b, c:false); setsr(.eq, res.ct) ; return res.res }
+  func adda ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = adder(a,b, c:false); return res.res }
   func adc ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = adder(a,b, c:sr.c, z:sr.z); setsr(.eq, res.ct) ; return res.res }
   
   func sub ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = adder(a,~b, c:true); setsr(.eq, res.ct) ; return res.res }
+  func suba ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = adder(a,~b, c:true); return res.res }
   func sbc ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = adder(a,~b, c:sr.c, z:sr.z); setsr(.eq, res.ct) ; return res.res }
   
   func rsb ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { return sub(b,a) }
 
-  func dad ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,b, c:false); setsr(.eq, res.ct) ; return res.res }
-  func dac ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,b, c:sr.c, z:sr.z); setsr(.eq, res.ct) ; return res.res }
+  func dad ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,b, c:false); setsr(.uge, res.ct) ; return res.res }          // TO DO sr .uge
+  func dac ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,b, c:sr.c, z:sr.z); setsr(.uge, res.ct) ; return res.res }   // TO DO sr .uge
   
-  func dsb ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,0x9999-b, c:true, z:sr.z); setsr(.eq, res.ct) ; return res.res }
-  func dsc ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,0x9999-b, c:sr.c, z:sr.z); setsr(.eq, res.ct) ; return res.res }
+  func dsb ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,0x9999-b, c:true, z:sr.z); setsr(.uge, res.ct) ; return res.res }  // TO DO sr .uge
+  func dsc ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = dadder(a,0x9999-b, c:sr.c, z:sr.z); setsr(.uge, res.ct) ; return res.res }  // TO DO sr .uge
   
   func or  ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = a | b ; setz(z:res==0) ; return res }
   func and ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = a & b ; setz(z:res==0) ; return res }
