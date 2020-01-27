@@ -253,8 +253,8 @@ class ALU
   
   func sl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 1 ; res[0,0] = 0 ;        setzc(z:res==0, c:a[15,15] != 0) ; return res }
   func sl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 4 ; res[3,0] = 0 ;        setzc(z:res==0, c:a[15,12] != 0) ; return res }
-  func rl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 1 ; res[0,0] = b[15,15] ; setzc(z:res==0, c:a[15,15] != 0) ; return res }
-  func rl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 4 ; res[3,0] = b[15,12] ; setzc(z:res==0, c:a[15,12] != 0) ; return res }
+  func rl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 1 ; res[0,0] = b[15,15] ; setzc(z:res==0, c:a[15,15] != 0) ; return res }
+  func rl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 4 ; res[3,0] = b[15,12] ; setzc(z:res==0, c:a[15,12] != 0) ; return res }
 }
 
 

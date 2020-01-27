@@ -59,7 +59,7 @@ class Machine
   func dad()  { q = alu.dad(a, b) }
   func dac()  { q = alu.dac(a, b) }
   
-  func rr1()  { q = alu.sr1(a, b) }
+  func rr1()  { q = alu.rr1(a, b) }
   func rl1()  { q = alu.rl1(a, b) }
   func cpc()  { wi_r = true ; q = alu.cpc(cc, a, b) }
   func mvl()  { reg[6] = reg[7] ; q = alu.ldb(a, b) }
