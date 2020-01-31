@@ -71,7 +71,12 @@ class SourceParser:PrimitiveParser
       let data = addr;
       var offset = 0;
       if parseChar( _plus ) {
-        if let value = parseInteger() { offset = value } }
+        if let value = parseInteger() { offset = value }
+      }
+      
+      else if parseChar( _minus ) {
+        if let value = parseInteger() { offset = -value }
+      }
       
       return (data,offset)
     }

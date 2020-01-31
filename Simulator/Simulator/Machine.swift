@@ -62,7 +62,7 @@ class Machine
   func rr1()  { q = alu.rr1(a, b) }
   func rl1()  { q = alu.rl1(a, b) }
   func cpc()  { wi_r = true ; q = alu.cpc(cc, a, b) }
-  func mvl()  { reg[6] = reg[7] ; q = alu.ldb(a, b) }
+  func mvl()  { reg[6] = 1+reg[7] ; q = alu.ldb(a, b) }
   func sub()  { q = alu.sub(a, b) }
   func sbc()  { q = alu.sbc(a, b) }
   func dsb()  { q = alu.dsb(a, b) }
@@ -86,8 +86,8 @@ class Machine
   func xor()  { q = alu.xor(a, b) }
   func rsb()  { q = alu.rsb(a, b)  }
   
-  func pfx()  { ie_pfr = true }
-  func hlt()  { mc_halt = true }
+  func pfx()  { wi_r = true; ie_pfr = true }
+  func hlt()  { wi_r = true; mc_halt = true }
   func __2()  {  }
   func lp()   { q = prg[alu.ldb(a, b)] }
   func __3()  {  }

@@ -100,7 +100,9 @@ main:
 # ---------------------------------------------
 
 	.data
-a:	.long 0x18465900
-b:	.long 0x78900000
+a:	.long 0x12000000
+b:	.long 0x30000000
+#a:	.long 0x18465932
+#b:	.long 0x78901234
 	.comm result,4,2       // reserve space in data memory for result
 
