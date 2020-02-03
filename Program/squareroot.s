@@ -18,17 +18,61 @@ Squareroot:                // sqrt(a)
 	
 # r0:r1 will become the radicand remainder
 	
-	mov 0, r0      
-	mov 0, r1           // R0:R1 will become the radicand remainder
+#	mov 0, r0
+#	mov 0, r1           // R0:R1 will become the radicand remainder
 
 # aux0, aux0+1 will become the accumlated root
 
-	mov r0, [&aux0]
-	mov r1, [&aux0+1]   // aux0, aux0+1 will become the accumlated root
-	
+//	mov r0, [&aux0]
+//	mov r1, [&aux0+1]   // aux0, aux0+1 will become the accumlated root
+
+# Check if exponent is an even number
+
+	mov [r4, 3], r0
+	and 0x10, r0      // Check if exponent is an even number
+#	adt 0x10, r1       // If so, add 1 to exponent
+#	mov r1, [r4, 3]    // Store exponent
+
+# Load Radicand and initialize remaninder
+
+	mov [r4, 0], r2     //
+	mov [r4, 1], r3     // Load  radicand
+
+	mov 0, r0           //
+	mov 0, r1           // R0:R1 will become the radicand remainder
+
+# If exponent was even we only need to shift once initially
+
+	bt .LSqrtEvenExponent  // Branch if exponent was even
+
+# Shift radicand into remainder (one)
+
+	rl4 r0, r3, r0
+	rl4 r3, r2, r3
+	sl4 r2, r2          // Shift one digit
+
+# Shift radicand into remainder (two)
+
+.LSqrtEvenExponent:
+	rl4 r0, r3, r0
+	rl4 r3, r2, r3
+	sl4 r2, r2          // Shift one digit
+
+# Update shifted radicand
+
+	mov r2, [r4, 0]
+	mov r3, [r4, 1]     // Save shifted radicand for next iteration
+
+	mov 0, r2
+	mov 0, r3
+
 # We will loop 6 times
 
 	mov 6, r6
+
+# Branch to sqrt entry
+
+	b .LSqrtFirstEntry
 
 # Shift next 2 digits of radicand into remainder
 
@@ -57,9 +101,9 @@ Squareroot:                // sqrt(a)
 	rl4 r3, r2, r3
 	sl4 r2, r2
 
+.LSqrtFirstEntry:
 	mov r2, [&aux0]
 	mov r3, [&aux0+1]  // Save for next iteration
-
 
 # Compute 2*Si - 1
 
@@ -102,6 +146,17 @@ Squareroot:                // sqrt(a)
 	mov [&aux0+1], r1
 	mov r0, [r4 ,0]
 	mov r1, [r4 ,1]
+
+# Adjust exponent to be half the original one and clear sign
+
+	mov [r4, 3], r0    // load exponent
+	sr4 r0, r0         // shift the exponent value to lower bits
+	dad r0, r0, r1     // times 0.2
+	dad r1, r1, r1     // times 0.4
+	dad r1, r0, r1     // times 0.5
+	dad 0x20, r1       // add 2 to compensate for two extra sqrt digits
+	and 0xfff0, r1     // clear sign
+	mov r1, [r4, 3]    // store exponent
 	
 # return
 	mov [&return], pc
@@ -166,7 +221,7 @@ sp:
 	.p2align 3
 a:
 	.long 0x38598118
-	.long 0x00100000      // +3.8598118e+01
+	.long 0x00300000      // +3.8598118e+01
 
 # ---------------------------------------------
 # Uninitialized Data

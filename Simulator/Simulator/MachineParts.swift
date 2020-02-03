@@ -139,6 +139,7 @@ class Status
   var z:Bool = false
   var c:Bool = false
   var t:Bool = false
+  var rr:UInt16 = 0
 }
 
 enum CC : UInt16 { case eq = 0, ne, uge, ult, ge, lt, ugt, gt }
@@ -186,19 +187,22 @@ class ALU
     sr.z = z
     sr.c = false
     sr.t = z
+    sr.rr = 0
   }
   
   // Set shift operation flags
-  private func setzc( z:Bool, c:Bool )
+  private func setzc( z:Bool, c:Bool, rr:UInt16 )
   {
     sr.z = z
     sr.c = c
     sr.t = c
+    sr.rr = rr
   }
   
   // Set arithmetic operation flags based on condition
   private func setsr( _ cc:CC, _ ct:Condition )
   {
+  	sr.rr = 0
     sr.z = ct.z
     sr.c = ct.c
     switch cc
@@ -245,16 +249,26 @@ class ALU
   func or  ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = a | b ; setz(z:res==0) ; return res }
   func and ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = a & b ; setz(z:res==0) ; return res }
   func xor ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { let res = a ^ b ; setz(z:res==0) ; return res }
-  
-  func sr1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 1 ; res[15,15] = 0 ;      setzc(z:res==0, c:a[0,0] != 0) ; return res }
-  func sr4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 4 ; res[15,12] = 0 ;      setzc(z:res==0, c:a[3,0] != 0) ; return res }
-  func rr1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 1 ; res[15,15] = b[1,1] ; setzc(z:res==0, c:a[0,0] != 0) ; return res }
-  func rr4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 4 ; res[15,12] = b[3,0] ; setzc(z:res==0, c:a[3,0] != 0) ; return res }
-  
-  func sl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 1 ; res[0,0] = 0 ;        setzc(z:res==0, c:a[15,15] != 0) ; return res }
-  func sl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 4 ; res[3,0] = 0 ;        setzc(z:res==0, c:a[15,12] != 0) ; return res }
-  func rl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 1 ; res[0,0] = b[15,15] ; setzc(z:res==0, c:a[15,15] != 0) ; return res }
-  func rl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 4 ; res[3,0] = b[15,12] ; setzc(z:res==0, c:a[15,12] != 0) ; return res }
+	
+	func sr1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b >> 1 ; res[15,15] = 0 ;     setzc(z:res==0, c:b[0,0] != 0, rr:b[0,0]) ; return res }
+  func sr4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b >> 4 ; res[15,12] = 0 ;     setzc(z:res==0, c:b[3,0] != 0, rr:b[3,0]) ; return res }
+  func rr1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b >> 1 ; res[15,15] = sr.rr ; setzc(z:res==0, c:b[0,0] != 0, rr:b[0,0]) ; return res }
+  func rr4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b >> 4 ; res[15,12] = sr.rr ; setzc(z:res==0, c:b[3,0] != 0, rr:b[3,0]) ; return res }
+	
+  func sl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b << 1 ; res[0,0] = 0 ;       setzc(z:res==0, c:b[15,15] != 0, rr:b[15,15]) ; return res }
+  func sl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b << 4 ; res[3,0] = 0 ;       setzc(z:res==0, c:b[15,12] != 0, rr:b[15,12]) ; return res }
+  func rl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b << 1 ; res[0,0] = sr.rr ;   setzc(z:res==0, c:b[15,15] != 0, rr:b[15,15]) ; return res }
+  func rl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = b << 4 ; res[3,0] = sr.rr ;   setzc(z:res==0, c:b[15,12] != 0, rr:b[15,12]) ; return res }
+	
+//  func sr1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 1 ; res[15,15] = 0 ;      setzc(z:res==0, c:a[0,0] != 0) ; return res }
+//  func sr4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 4 ; res[15,12] = 0 ;      setzc(z:res==0, c:a[3,0] != 0) ; return res }
+//  func rr1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 1 ; res[15,15] = b[1,1] ; setzc(z:res==0, c:a[0,0] != 0) ; return res }
+//  func rr4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a >> 4 ; res[15,12] = b[3,0] ; setzc(z:res==0, c:a[3,0] != 0) ; return res }
+//
+//  func sl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 1 ; res[0,0] = 0 ;        setzc(z:res==0, c:a[15,15] != 0) ; return res }
+//  func sl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 4 ; res[3,0] = 0 ;        setzc(z:res==0, c:a[15,12] != 0) ; return res }
+//  func rl1 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 1 ; res[0,0] = b[15,15] ; setzc(z:res==0, c:a[15,15] != 0) ; return res }
+//  func rl4 ( _ a:UInt16, _ b:UInt16 ) -> UInt16 { var res = a << 4 ; res[3,0] = b[15,12] ; setzc(z:res==0, c:a[15,12] != 0) ; return res }
 }
 
 

@@ -1,0 +1,553 @@
+	j setup
+
+-----
+file:///Users/joan/Documents-Local/Relay/G6A-RISC/Program/squareroot5L.s
+
+Squareroot:
+	mov r6, [return]
+	mov [dsp], r6
+	mov [r6, 0], r0
+	mov [r6, 1], r1
+	mov [r6, 2], r2
+	mov [r6, 3], r6
+	and 16, r6
+	bt .LSqrtEndShift
+	sl4 r0, r0
+	rl4 r1, r1
+	rl4 r2, r2
+.LSqrtEndShift:
+	dad r0, r0, r3
+	dac r1, r1, r4
+	dac r2, r2, r5
+	dad r3, r3, r3
+	dac r4, r4, r4
+	dac r5, r5, r5
+	dad r3, r0, r3
+	dac r4, r1, r4
+	dac r5, r2, r5
+	mov 0, r0
+	mov 0, r1
+	mov 256, r2
+	mov r0, [aux1]
+	mov r1, [aux1+1]
+	mov r2, [aux1+2]
+	mov 80, r2
+	mov r0, [aux0]
+	mov r1, [aux0+1]
+	mov r2, [aux0+2]
+	mov 11, r6
+.LSqrtOuter:
+.LSqrtInnerOne:
+	dsb r3, r0, r3
+	dsc r4, r1, r4
+	dsc r5, r2, r5
+	bf .LSqrtInnerEnd
+.LSqrtInnerLoop:
+	dad [aux1], r0
+	dac [aux1+1], r1
+	dac [aux1+2], r2
+	dsb r3, r0, r3
+	dsc r4, r1, r4
+	dsc r5, r2, r5
+	bt .LSqrtInnerLoop
+.LSqrtInnerEnd:
+	sub 1, r6
+	bt .LSqrtMantisaDone
+	dad r3, r0, r3
+	dac r4, r1, r4
+	dac r5, r2, r5
+	dsb [aux0], r0
+	dsc [aux0+1], r1
+	dsc [aux0+2], r2
+	sr4 [aux0+2]
+	rr4 [aux0+1]
+	rr4 [aux0]
+	dad [aux0], r0
+	dac [aux0+1], r1
+	dac [aux0+2], r2
+	sr4 [aux1+2]
+	rr4 [aux1+1]
+	rr4 [aux1]
+	sl4 r3, r3
+	rl4 r4, r4
+	rl4 r5, r5
+	b .LSqrtOuter
+.LSqrtMantisaDone:
+	mov [dsp], r6
+	mov r0, [r6, 0]
+	mov r1, [r6, 1]
+	mov r2, [r6, 2]
+	mov [r6, 3], r0
+	sr4 r0, r0
+	dad r0, r0, r1
+	dad r1, r1, r1
+	dad r1, r0, r1
+	sr4 r1, r1
+	dsb 1, r1
+	sl4 r1, r1
+	mov r1, [r6, 3]
+	mov [return], r7
+
+main:
+	mov [dsp], r4
+	add 4, r4
+	mov [a], r0
+	mov r0, [r4, 0]
+	mov [a+1], r0
+	mov r0, [r4, 1]
+	mov [a+2], r0
+	mov r0, [r4, 2]
+	mov [a+3], r0
+	mov r0, [r4, 3]
+	mov r4, [dsp]
+	jl Squareroot
+	mov [dsp], r4
+	mov [r4, 0], r0
+	mov r0, [result]
+	mov [r4, 1], r0
+	mov r0, [result+1]
+	mov [r4, 2], r0
+	mov r0, [result+2]
+	mov [r4, 3], r0
+	mov r0, [result+3]
+	hlt
+dsp:
+	dstack+-4
+sp:
+	pstack+512
+a:
+	4503841647171584
+return:
+cntr:
+aux0:
+aux1:
+aux2:
+result:
+dstack:
+pstack:
+
+
+setup:
+	mov setupAddr, r0
+	mov 0, r4
+	mov wordLength, r1
+.LL0:
+	cmp eq, r1, r4
+	bt .LL1
+	lp [r0], r3
+	mov r3, [r4, dataAddr]
+	add 1, r0
+	add 1, r4
+	b .LL0
+.LL1:
+	j main
+
+Optimizing: setup, Value: 138, (no change) 
+Optimizing: return, Value: 8,  
+Optimizing: dsp, Value: 0,  
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 16, (no change) 
+Optimizing: .LSqrtEndShift, Value: 4, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 256,  
+Optimizing: aux1, Value: 16,  
+Optimizing: aux1, Value: 17,  
+Optimizing: aux1, Value: 18,  
+Optimizing: <immediate>, Value: 80,  
+Optimizing: aux0, Value: 12,  
+Optimizing: aux0, Value: 13,  
+Optimizing: aux0, Value: 14,  
+Optimizing: <immediate>, Value: 11, (no change) 
+Optimizing: .LSqrtInnerEnd, Value: 11, (no change) 
+Optimizing: aux1, Value: 16,  
+Optimizing: aux1, Value: 17,  
+Optimizing: aux1, Value: 18,  
+Optimizing: .LSqrtInnerLoop, Value: -9, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LSqrtMantisaDone, Value: 32,  
+Optimizing: aux0, Value: 12,  
+Optimizing: aux0, Value: 13,  
+Optimizing: aux0, Value: 14,  
+Optimizing: aux0, Value: 14,  
+Optimizing: aux0, Value: 13,  
+Optimizing: aux0, Value: 12,  
+Optimizing: aux0, Value: 12,  
+Optimizing: aux0, Value: 13,  
+Optimizing: aux0, Value: 14,  
+Optimizing: aux1, Value: 18,  
+Optimizing: aux1, Value: 17,  
+Optimizing: aux1, Value: 16,  
+Optimizing: .LSqrtOuter, Value: -46,  
+Optimizing: dsp, Value: 0,  
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: return, Value: 8,  
+Optimizing: dsp, Value: 0,  
+Optimizing: <immediate>, Value: 4, (no change) 
+Optimizing: a, Value: 4,  
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: a, Value: 5,  
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: a, Value: 6,  
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: a, Value: 7,  
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: dsp, Value: 0,  
+Optimizing: Squareroot, Value: 2,  
+Optimizing: dsp, Value: 0,  
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: result, Value: 24,  
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: result, Value: 25,  
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: result, Value: 26,  
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: result, Value: 27,  
+Optimizing: setupAddr, Value: 153, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: wordLength, Value: 8,  
+Optimizing: .LL1, Value: 40,  
+Optimizing: dataAddr, Value: 0,  
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LL0, Value: 26, (no change) 
+Optimizing: main, Value: 104, (no change) 
+Replacing: Squareroot, Value: 2...New Value: 2
+Replacing: .LSqrtEndShift, Value: 15...New Value: 13
+Replacing: .LSqrtOuter, Value: 41...New Value: 35
+Replacing: .LSqrtInnerOne, Value: 41...New Value: 35
+Replacing: .LSqrtInnerLoop, Value: 45...New Value: 39
+Replacing: .LSqrtInnerEnd, Value: 55...New Value: 46
+Replacing: .LSqrtMantisaDone, Value: 88...New Value: 69
+Replacing: main, Value: 104...New Value: 83
+Replacing: setup, Value: 138...New Value: 105
+Replacing: .LL0, Value: 143...New Value: 109
+Replacing: .LL1, Value: 151...New Value: 117
+Optimizing: setup, Value: 105, (no change) 
+Optimizing: return, Value: 8, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 16, (no change) 
+Optimizing: .LSqrtEndShift, Value: 4, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 256, (no change) 
+Optimizing: aux1, Value: 16, (no change) 
+Optimizing: aux1, Value: 17, (no change) 
+Optimizing: aux1, Value: 18, (no change) 
+Optimizing: <immediate>, Value: 80, (no change) 
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: <immediate>, Value: 11, (no change) 
+Optimizing: .LSqrtInnerEnd, Value: 8, (no change) 
+Optimizing: aux1, Value: 16, (no change) 
+Optimizing: aux1, Value: 17, (no change) 
+Optimizing: aux1, Value: 18, (no change) 
+Optimizing: .LSqrtInnerLoop, Value: -6, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LSqrtMantisaDone, Value: 21,  
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: aux1, Value: 18, (no change) 
+Optimizing: aux1, Value: 17, (no change) 
+Optimizing: aux1, Value: 16, (no change) 
+Optimizing: .LSqrtOuter, Value: -33, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: return, Value: 8, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 4, (no change) 
+Optimizing: a, Value: 4, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: a, Value: 5, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: a, Value: 6, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: a, Value: 7, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: Squareroot, Value: 2, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: result, Value: 24, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: result, Value: 25, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: result, Value: 26, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: result, Value: 27, (no change) 
+Optimizing: setupAddr, Value: 119, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: wordLength, Value: 8, (no change) 
+Optimizing: .LL1, Value: 7,  
+Optimizing: dataAddr, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LL0, Value: -6, (no change) 
+Optimizing: main, Value: 83, (no change) 
+Replacing: Squareroot, Value: 2...New Value: 2
+Replacing: .LSqrtEndShift, Value: 13...New Value: 13
+Replacing: .LSqrtOuter, Value: 35...New Value: 35
+Replacing: .LSqrtInnerOne, Value: 35...New Value: 35
+Replacing: .LSqrtInnerLoop, Value: 39...New Value: 39
+Replacing: .LSqrtInnerEnd, Value: 46...New Value: 46
+Replacing: .LSqrtMantisaDone, Value: 69...New Value: 68
+Replacing: main, Value: 83...New Value: 82
+Replacing: setup, Value: 105...New Value: 104
+Replacing: .LL0, Value: 109...New Value: 108
+Replacing: .LL1, Value: 117...New Value: 115
+Optimizing: setup, Value: 104, (no change) 
+Optimizing: return, Value: 8, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 16, (no change) 
+Optimizing: .LSqrtEndShift, Value: 4, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 256, (no change) 
+Optimizing: aux1, Value: 16, (no change) 
+Optimizing: aux1, Value: 17, (no change) 
+Optimizing: aux1, Value: 18, (no change) 
+Optimizing: <immediate>, Value: 80, (no change) 
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: <immediate>, Value: 11, (no change) 
+Optimizing: .LSqrtInnerEnd, Value: 8, (no change) 
+Optimizing: aux1, Value: 16, (no change) 
+Optimizing: aux1, Value: 17, (no change) 
+Optimizing: aux1, Value: 18, (no change) 
+Optimizing: .LSqrtInnerLoop, Value: -6, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LSqrtMantisaDone, Value: 21, (no change) 
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 12, (no change) 
+Optimizing: aux0, Value: 13, (no change) 
+Optimizing: aux0, Value: 14, (no change) 
+Optimizing: aux1, Value: 18, (no change) 
+Optimizing: aux1, Value: 17, (no change) 
+Optimizing: aux1, Value: 16, (no change) 
+Optimizing: .LSqrtOuter, Value: -32, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: return, Value: 8, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 4, (no change) 
+Optimizing: a, Value: 4, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: a, Value: 5, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: a, Value: 6, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: a, Value: 7, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: Squareroot, Value: 2, (no change) 
+Optimizing: dsp, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: result, Value: 24, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: result, Value: 25, (no change) 
+Optimizing: <immediate>, Value: 2, (no change) 
+Optimizing: result, Value: 26, (no change) 
+Optimizing: <immediate>, Value: 3, (no change) 
+Optimizing: result, Value: 27, (no change) 
+Optimizing: setupAddr, Value: 117, (no change) 
+Optimizing: <immediate>, Value: 0, (no change) 
+Optimizing: wordLength, Value: 8, (no change) 
+Optimizing: .LL1, Value: 6, (no change) 
+Optimizing: dataAddr, Value: 0, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: <immediate>, Value: 1, (no change) 
+Optimizing: .LL0, Value: -6, (no change) 
+Optimizing: main, Value: 82, (no change) 
+-----
+Upon machine reset this will be moved to data memory, see setup code below
+
+Constant Data:
+00000 : 0 bytes
+
+Initialised Variables:
+00000 : 0x18,0x00  dstack+-4  Data:24
+00001 : 0x60,0x02  pstack+512  Data:608
+00002 : 0x00,0x00  0  :0
+00003 : 0x00,0x00  0  :0
+00004 : 0x00,0x18,0x81,0x59,0x38,0x00,0x10,0x00  4503841647171584  :1501632512
+
+Unitialised Variables:
+00008 : 1200 bytes
+
+-----
+file:/Users/joan/Documents-Local/Relay/G6A-RISC/Program/squareroot5L.g6a
+
+Source: start
+00000 : 0000000000000011 (0003) _pfix  Program:00104
+00001 : 1101111100001000 (DF08) j setup  Program:00104
+
+Source: main.s
+00002 : 0101111000101000 (5E28) mov r6, [return]  Data:00008
+00003 : 0101111000000000 (5E00) mov [dsp], r6  Data:00000
+00004 : 0001100011000000 (18C0) mov [r6, 0], r0
+00005 : 0001100111000001 (19C1) mov [r6, 1], r1
+00006 : 0001101011000010 (1AC2) mov [r6, 2], r2
+00007 : 0001111011000011 (1EC3) mov [r6, 3], r6
+00008 : 1111111010010000 (FE90) and 16, r6
+00009 : 1110011110000100 (E784) bt .LSqrtEndShift  Program:+4
+00010 : 1000100010000000 (8880) sl4 r0, r0
+00011 : 1000100111000001 (89C1) rl4 r1, r1
+00012 : 1000101011000010 (8AC2) rl4 r2, r2
+00013 : 1011001100000000 (B300) dad r0, r0, r3
+00014 : 1011110000001001 (BC09) dac r1, r1, r4
+00015 : 1011110100010010 (BD12) dac r2, r2, r5
+00016 : 1011001100011011 (B31B) dad r3, r3, r3
+00017 : 1011110000100100 (BC24) dac r4, r4, r4
+00018 : 1011110100101101 (BD2D) dac r5, r5, r5
+00019 : 1011001100011000 (B318) dad r3, r0, r3
+00020 : 1011110000100001 (BC21) dac r4, r1, r4
+00021 : 1011110100101010 (BD2A) dac r5, r2, r5
+00022 : 1101100000000000 (D800) mov 0, r0
+00023 : 1101100100000000 (D900) mov 0, r1
+00024 : 0000000000001000 (0008) _pfix
+00025 : 1101101000000000 (DA00) mov 256, r2
+00026 : 0101100000110000 (5830) mov r0, [aux1]  Data:00016
+00027 : 0101100100110001 (5931) mov r1, [aux1+1]  Data:00017
+00028 : 0101101000110010 (5A32) mov r2, [aux1+2]  Data:00018
+00029 : 0000000000000010 (0002) _pfix
+00030 : 1101101000010000 (DA10) mov 80, r2
+00031 : 0101100000101100 (582C) mov r0, [aux0]  Data:00012
+00032 : 0101100100101101 (592D) mov r1, [aux0+1]  Data:00013
+00033 : 0101101000101110 (5A2E) mov r2, [aux0+2]  Data:00014
+00034 : 1101111000001011 (DE0B) mov 11, r6
+00035 : 1011001101011000 (B358) dsb r3, r0, r3
+00036 : 1011110001100001 (BC61) dsc r4, r1, r4
+00037 : 1011110101101010 (BD6A) dsc r5, r2, r5
+00038 : 1110111110001000 (EF88) bf .LSqrtInnerEnd  Program:+8
+00039 : 0111000000010000 (7010) dad [aux1], r0  Data:00016
+00040 : 0111100100010001 (7911) dac [aux1+1], r1  Data:00017
+00041 : 0111101000010010 (7A12) dac [aux1+2], r2  Data:00018
+00042 : 1011001101011000 (B358) dsb r3, r0, r3
+00043 : 1011110001100001 (BC61) dsc r4, r1, r4
+00044 : 1011110101101010 (BD6A) dsc r5, r2, r5
+00045 : 1110011111000110 (E7C6) bt .LSqrtInnerLoop  Program:-6
+00046 : 1110011001000001 (E641) sub 1, r6
+00047 : 1110011110010101 (E795) bt .LSqrtMantisaDone  Program:+21
+00048 : 1011001100011000 (B318) dad r3, r0, r3
+00049 : 1011110000100001 (BC21) dac r4, r1, r4
+00050 : 1011110100101010 (BD2A) dac r5, r2, r5
+00051 : 0111000001001100 (704C) dsb [aux0], r0  Data:00012
+00052 : 0111100101001101 (794D) dsc [aux0+1], r1  Data:00013
+00053 : 0111101001001110 (7A4E) dsc [aux0+2], r2  Data:00014
+00054 : 0100000010101110 (40AE) sr4 [aux0+2]  Data:00014
+00055 : 0100000011101101 (40ED) rr4 [aux0+1]  Data:00013
+00056 : 0100000011101100 (40EC) rr4 [aux0]  Data:00012
+00057 : 0111000000001100 (700C) dad [aux0], r0  Data:00012
+00058 : 0111100100001101 (790D) dac [aux0+1], r1  Data:00013
+00059 : 0111101000001110 (7A0E) dac [aux0+2], r2  Data:00014
+00060 : 0100000010110010 (40B2) sr4 [aux1+2]  Data:00018
+00061 : 0100000011110001 (40F1) rr4 [aux1+1]  Data:00017
+00062 : 0100000011110000 (40F0) rr4 [aux1]  Data:00016
+00063 : 1000101110000011 (8B83) sl4 r3, r3
+00064 : 1000110011000100 (8CC4) rl4 r4, r4
+00065 : 1000110111000101 (8DC5) rl4 r5, r5
+00066 : 0000000000000001 (0001) _pfix  Program:-32
+00067 : 1110011101000000 (E740) b .LSqrtOuter  Program:-32
+00068 : 0101111000000000 (5E00) mov [dsp], r6  Data:00000
+00069 : 0001100011100000 (18E0) mov r0, [r6, 0]
+00070 : 0001100111100001 (19E1) mov r1, [r6, 1]
+00071 : 0001101011100010 (1AE2) mov r2, [r6, 2]
+00072 : 0001100011000011 (18C3) mov [r6, 3], r0
+00073 : 1000000010000000 (8080) sr4 r0, r0
+00074 : 1011000100000000 (B100) dad r0, r0, r1
+00075 : 1011000100001001 (B109) dad r1, r1, r1
+00076 : 1011000100001000 (B108) dad r1, r0, r1
+00077 : 1000000110000001 (8181) sr4 r1, r1
+00078 : 1111000101000001 (F141) dsb 1, r1
+00079 : 1000100110000001 (8981) sl4 r1, r1
+00080 : 0001100111100011 (19E3) mov r1, [r6, 3]
+00081 : 0101111100001000 (5F08) mov [return], r7  Data:00008
+00082 : 0101110000000000 (5C00) mov [dsp], r4  Data:00000
+00083 : 1110010000000100 (E404) add 4, r4
+00084 : 0101100000000100 (5804) mov [a], r0  Data:00004
+00085 : 0001100001100000 (1860) mov r0, [r4, 0]
+00086 : 0101100000000101 (5805) mov [a+1], r0  Data:00005
+00087 : 0001100001100001 (1861) mov r0, [r4, 1]
+00088 : 0101100000000110 (5806) mov [a+2], r0  Data:00006
+00089 : 0001100001100010 (1862) mov r0, [r4, 2]
+00090 : 0101100000000111 (5807) mov [a+3], r0  Data:00007
+00091 : 0001100001100011 (1863) mov r0, [r4, 3]
+00092 : 0101110000100000 (5C20) mov r4, [dsp]  Data:00000
+00093 : 1101111101000010 (DF42) jl Squareroot  Program:00002
+00094 : 0101110000000000 (5C00) mov [dsp], r4  Data:00000
+00095 : 0001100001000000 (1840) mov [r4, 0], r0
+00096 : 0101100000111000 (5838) mov r0, [result]  Data:00024
+00097 : 0001100001000001 (1841) mov [r4, 1], r0
+00098 : 0101100000111001 (5839) mov r0, [result+1]  Data:00025
+00099 : 0001100001000010 (1842) mov [r4, 2], r0
+00100 : 0101100000111010 (583A) mov r0, [result+2]  Data:00026
+00101 : 0001100001000011 (1843) mov [r4, 3], r0
+00102 : 0101100000111011 (583B) mov r0, [result+3]  Data:00027
+00103 : 0000100000000000 (0800) hlt
+
+Source: setup
+00104 : 0000000000000011 (0003) _pfix  :00117
+00105 : 1101100000010101 (D815) mov setupAddr, r0  :00117
+00106 : 1101110000000000 (DC00) mov 0, r4
+00107 : 1101100100001000 (D908) mov wordLength, r1  :00008
+00108 : 1001000000001100 (900C) cmp eq, r1, r4
+00109 : 1110011110000110 (E786) bt .LL1  Program:+6
+00110 : 0001101100000000 (1B00) lp [r0], r3
+00111 : 0001101101100000 (1B60) mov r3, [r4, dataAddr]  :00000
+00112 : 1110000000000001 (E001) add 1, r0
+00113 : 1110010000000001 (E401) add 1, r4
+00114 : 1110011101000110 (E746) b .LL0  Program:-6
+00115 : 0000000000000010 (0002) _pfix  Program:00082
+00116 : 1101111100010010 (DF12) j main  Program:00082
+
+Source: setupData
+00117 : 0000000000011000 (0018) _imm 24
+00118 : 0000001001100000 (0260) _imm 608
+00119 : 0000000000000000 (0000) _imm 0
+00120 : 0000000000000000 (0000) _imm 0
+00121 : 0001100000000000 (1800) _imm 6144
+00122 : 0101100110000001 (5981) _imm 22913
+00123 : 0000000000111000 (0038) _imm 56
+00124 : 0000000000010000 (0010) _imm 16
+
+Assembly completed

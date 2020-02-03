@@ -612,6 +612,18 @@ class SourceParser:PrimitiveParser
     }
     return false
   }
+	
+	//-------------------------------------------------------------------------------------------
+  func parseQuad() -> Bool
+  {
+    if parseConcreteToken(cStr: "quad".d )
+    {
+      skipSpTab()
+      if restParseData( 8 ) { return true }
+      else { error("Expecting data value") }
+    }
+    return false
+  }
 
  //-------------------------------------------------------------------------------------------
   func parseAscii() -> Bool
@@ -867,6 +879,7 @@ class SourceParser:PrimitiveParser
           if parseByte() { continue }
           if parseShort() { continue }
           if parseLong() { continue }
+          if parseQuad() { continue }
           if parseData() { continue }
           if parseComm() { continue }
           if parseAscii() { continue }

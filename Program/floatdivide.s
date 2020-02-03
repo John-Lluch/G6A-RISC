@@ -15,14 +15,14 @@ divide:                // a / b
 # Load divisor mantissa into register r4:r5
 
 	mov [&dsp], r6     // b
-	mov [r6,0], r4 
-	mov [r6,1], r5
+	mov [r6, 0], r4
+	mov [r6, 1], r5
 
 # Load dividend mantissa into register r2:r3
 
 	sub 4, r6          // a
-	mov [r6,0], r2 
-	mov [r6,1], r3	
+	mov [r6, 0], r2
+	mov [r6, 1], r3	
 	
 # r0:r1 will become the result
 	
@@ -96,15 +96,15 @@ divide:                // a / b
 # Get exponents
 
 	mov [&dsp], r6   // b
-	mov [r6,3], r5   // divisor exponent
+	mov [r6, 3], r5   // divisor exponent
 	
 	sub 4, r6        // a
-	mov [r6,3], r4   // divider exponent
+	mov [r6, 3], r4   // divider exponent
 	
 # Store mantissa in the place of divider
 
-	mov r0, [r6,0] 
-	mov r1, [r6,1]
+	mov r0, [r6, 0]
+	mov r1, [r6, 1]
 	
 # Subtract exponents and adjust sign
 	
@@ -116,7 +116,7 @@ divide:                // a / b
 	
 # store exponent
 
-	mov r3, [r6,3]
+	mov r3, [r6, 3]
 	
 # update dsp
 
