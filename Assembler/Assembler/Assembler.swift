@@ -336,7 +336,7 @@ class Assembler
         {
           let str = String(encoding, radix:2) //binary base
           let padd = String(repeating:"0", count:(16 - str.count))
-          var prStr = String(format:"%05d : %@%@ (%04X) %@", addr, padd, str, encoding, (inst != nil ? String(reflecting:inst!) : "_pfix") )
+          var prStr = String(format:"%05d (%04X) : %@%@ (%04X) %@", addr, addr, padd, str, encoding, (inst != nil ? String(reflecting:inst!) : "_pfix") )
           if ( aa != nil && isRelative)  { prStr += String(format:"  %@:%+d", bankStr, aa!) }
           if ( aa != nil && !isRelative) { prStr += String(format:"  %@:%05d", bankStr, aa!) }
           out.logln( prStr )
@@ -390,7 +390,7 @@ class Assembler
     // Debug log stuff...
     if out.logEnabled
     {
-      var prStr = String(format:"%05d : ", dataMemory.count/source.dataWidth)
+      var prStr = String(format:"%05d (%04X) : ", dataMemory.count/source.dataWidth, dataMemory.count/source.dataWidth)
       for i in 0..<bytes.count
       {
         let byte:UInt8 = bytes[i]

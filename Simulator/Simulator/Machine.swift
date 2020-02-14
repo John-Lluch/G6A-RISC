@@ -81,8 +81,8 @@ class Machine
   func rl4()  { q = alu.rl4(a, b) }
   func sef()  { q = !alu.sr.t ? alu.ldb(a, b) : 0 }
   func sel()  { q = alu.sr.t ? alu.ldb(a, b) : alu.lda(a, b) }
-  func sbt()  { wi_r = !alu.sr.t ; q = alu.suba(a, b) }
-  func sbf()  { wi_r = alu.sr.t ; q = alu.suba(a, b) }
+  func sbt()  { wi_r = !alu.sr.t ; q = sto ? alu.suba(b, a) : alu.suba(a, b) }
+  func sbf()  { wi_r = alu.sr.t ; q = sto ? alu.suba(b, a) : alu.suba(a, b) }
   func xor()  { q = alu.xor(a, b) }
   func rsb()  { q = sto ? alu.rsb(b, a) : alu.rsb(a, b)  }
   
@@ -280,8 +280,8 @@ class Machine
     var str_ir = String(ir, radix:2) //binary base
     str_ir = String(repeating:"0", count:(16 - str_ir.count)) + str_ir
     
-    let addr = String(format:"%05d", reg[7] )
-    let prStr = String(format:"%@ : %@ (%04X)", addr, str_ir, ir )
+    let addr = reg[7]
+    let prStr = String(format:"%05d (%04X) : %@ (%04X)", addr, addr, str_ir, ir )
     out.log( prStr )
   }
 
